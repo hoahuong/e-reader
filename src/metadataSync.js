@@ -67,7 +67,41 @@ export async function syncMetadataToLocal(metadata) {
   try {
     // Sync catalogs
     if (catalogs.length > 0) {
-      const db = await openDBWithCatalogs();
+      // Sử dụng openDB và tạo catalogs store nếu cần
+      const DB_NAME = 'PDFReaderDB';
+      const CATALOG_STORE_NAME = 'catalogs';
+      const MIN_VERSION = 5;
+      
+      const db = await new Promise((resolve, reject) => {
+        const checkRequest = indexedDB.open(DB_NAME);
+        checkRequest.onerror = () => reject(checkRequest.error);
+        checkRequest.onsuccess = () => {
+          const currentDb = checkRequest.result;
+          const currentVersion = currentDb.version;
+          const hasCatalogsStore = currentDb.objectStoreNames.contains(CATALOG_STORE_NAME);
+          currentDb.close();
+
+          if (hasCatalogsStore && currentVersion >= MIN_VERSION) {
+            const request = indexedDB.open(DB_NAME, currentVersion);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+            return;
+          }
+
+          const targetVersion = Math.max(currentVersion + 1, MIN_VERSION);
+          const request = indexedDB.open(DB_NAME, targetVersion);
+          request.onerror = () => reject(request.error);
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(CATALOG_STORE_NAME)) {
+              const catalogStore = db.createObjectStore(CATALOG_STORE_NAME, { keyPath: 'id' });
+              catalogStore.createIndex('name', 'name', { unique: true });
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+        };
+      });
+      
       const tx = db.transaction('catalogs', 'readwrite');
       const store = tx.objectStore('catalogs');
 

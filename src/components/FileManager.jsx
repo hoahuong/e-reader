@@ -142,7 +142,11 @@ function FileManager({ onFileSelect }) {
 
     try {
       const catalog = await createCatalog(name.trim());
-      setCatalogs([...catalogs, catalog]);
+      const updatedCatalogs = [...catalogs, catalog];
+      setCatalogs(updatedCatalogs);
+      
+      // Sync metadata lên cloud sau khi tạo catalog (đã được sync trong createCatalog, nhưng sync lại để đảm bảo)
+      saveMetadataToCloud(updatedCatalogs, files).catch(() => {}); // Background sync
     } catch (error) {
       console.error('Error creating catalog:', error);
       alert('Không thể tạo catalog: ' + error.message);
