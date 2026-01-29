@@ -104,6 +104,7 @@
   flex-direction: column;
   position: relative;
   height: calc(100vh - 0px);
+  min-height: 0; /* Quan trọng để flex children có thể scroll */
   /* Sẽ được điều chỉnh khi có minimal header */
 }
 
