@@ -369,9 +369,14 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
     try {
       const page = await pdfDocRef.current.getPage(pageNum);
 
-      // Tăng scale để render ở độ phân giải cao hơn, sau đó scale down để tránh blur
-      const renderScale = scale * (typeof window !== 'undefined' && window.devicePixelRatio > 1 ? window.devicePixelRatio : 1.5);
-      const viewport = page.getViewport({ scale: renderScale });
+      // Tính outputScale độc lập với scale hiển thị để đảm bảo độ phân giải cao
+      // Tối thiểu 2x để đảm bảo độ nét trên mọi màn hình (giống Google Drive)
+      const outputScale = typeof window !== 'undefined' 
+        ? Math.max(window.devicePixelRatio || 1, 2) 
+        : 2;
+      
+      // Viewport với scale hiển thị (không nhân với devicePixelRatio)
+      const viewport = page.getViewport({ scale: scale });
 
       // Tạo canvas mới với text rendering tối ưu
       const canvas = document.createElement('canvas');
@@ -380,19 +385,23 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
         desynchronized: true, // Tăng performance
       });
 
-      // Render ở độ phân giải cao hơn
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      // Set canvas internal resolution cao (nhân với outputScale)
+      // Đây là điểm quan trọng: canvas resolution cao hơn CSS size
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
       canvas.className = 'pdf-canvas-direct';
 
-      // Scale canvas để hiển thị đúng kích thước nhưng giữ độ nét cao
-      const displayScale = scale / renderScale;
-      canvas.style.width = `${viewport.width * displayScale}px`;
-      canvas.style.height = `${viewport.height * displayScale}px`;
+      // CSS size giữ nguyên viewport size (không scale)
+      // Browser sẽ tự động scale down từ internal resolution cao xuống CSS size
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
 
       // Tối ưu text rendering để chữ đậm và rõ hơn
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
+
+      // Scale context để match với canvas internal resolution
+      context.scale(outputScale, outputScale);
 
       // Đảm bảo canvas có style đúng ngay từ đầu
       // Lấy readingMode từ state hiện tại
@@ -408,16 +417,27 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
       canvas.style.visibility = 'visible';
       canvas.style.opacity = '1';
       canvas.style.maxWidth = '100%';
-      // height: auto removed to respect calculated height
       canvas.style.backgroundColor = bgColor;
 
-      // Render PDF page vào canvas
+      // Render PDF page vào canvas với transform matrix
+      // PDF.js sẽ render vào viewport, và context.scale đã được set ở trên
       const renderContext = {
         canvasContext: context,
         viewport: viewport,
       };
 
       await page.render(renderContext).promise;
+      
+      console.log('High-resolution canvas rendered:', {
+        pageNum,
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        outputScale,
+        displayScale: scale,
+        devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 'N/A'
+      });
 
       // Cache canvas
       canvasCacheRef.current.set(cacheKey, canvas);
@@ -469,24 +489,33 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
     // Clone canvas và copy image data để tránh conflict khi dùng cùng canvas
     const displayCanvas = document.createElement('canvas');
 
-    // Sử dụng kích thước hiển thị từ canvas gốc (đã được scale)
-    const displayWidth = canvas.style.width && canvas.style.width !== 'auto' ? parseInt(canvas.style.width) : canvas.width;
-    const displayHeight = canvas.style.height && canvas.style.height !== 'auto' ? parseInt(canvas.style.height) : canvas.height;
-
+    // Canvas đã được render ở độ phân giải cao với outputScale
+    // Giữ nguyên internal resolution cao từ canvas gốc để đảm bảo độ nét
     displayCanvas.width = canvas.width; // Giữ nguyên độ phân giải cao
     displayCanvas.height = canvas.height;
     displayCanvas.className = 'pdf-canvas-direct';
 
-    // Set kích thước hiển thị
+    // Sử dụng CSS size từ canvas gốc (đã được set đúng trong renderPage)
+    // Canvas gốc đã có CSS size = viewport size (không scale)
+    const displayWidth = canvas.style.width && canvas.style.width !== 'auto' 
+      ? parseInt(canvas.style.width) 
+      : canvas.width / Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
+    const displayHeight = canvas.style.height && canvas.style.height !== 'auto' 
+      ? parseInt(canvas.style.height) 
+      : canvas.height / Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
+
+    // Set kích thước hiển thị (CSS size, không phải internal resolution)
+    // Browser sẽ tự động scale down từ internal resolution cao xuống CSS size này
     displayCanvas.style.width = `${displayWidth}px`;
     displayCanvas.style.height = `${displayHeight}px`;
 
-    // Copy image data từ canvas gốc với tối ưu để giữ độ nét nhưng vẫn MỊN
+    // Copy image data từ canvas gốc với tối ưu để giữ độ nét cao
     const ctx = displayCanvas.getContext('2d', {
       alpha: false,
     });
     ctx.imageSmoothingEnabled = true; // BẬT smoothing để chữ mịn, không bị răng cưa
     ctx.imageSmoothingQuality = 'high'; // Chất lượng cao nhất
+    // Copy trực tiếp từ canvas gốc (đã có độ phân giải cao)
     ctx.drawImage(canvas, 0, 0);
 
     // Đảm bảo canvas có style đúng với viền trang sách và tối ưu cho mắt
