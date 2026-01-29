@@ -39,30 +39,42 @@ function loadFromLocalStorage() {
 }
 
 /**
- * Load metadata từ cloud (không làm gì, chỉ để tương thích với interface)
+ * Load metadata từ cloud (thực ra chỉ load từ localStorage backup)
  */
 export async function loadMetadataFromCloud() {
-  // Với local-only mode, không load từ cloud
-  // Chỉ load từ localStorage backup nếu có
-  const backup = loadFromLocalStorage();
-  if (backup) {
-    return backup;
+  try {
+    console.log('[Metadata Sync Local] Đang load metadata từ localStorage backup...');
+    // Với local-only mode, không load từ cloud
+    // Chỉ load từ localStorage backup nếu có
+    const backup = loadFromLocalStorage();
+    if (backup && (backup.catalogs?.length > 0 || backup.files?.length > 0)) {
+      console.log(`[Metadata Sync Local] Load thành công từ backup: ${backup.catalogs?.length || 0} catalogs, ${backup.files?.length || 0} files`);
+      return backup;
+    }
+    console.log('[Metadata Sync Local] Không có backup trong localStorage');
+    return null;
+  } catch (error) {
+    console.warn('[Metadata Sync Local] Lỗi khi load từ localStorage:', error.message);
+    return null;
   }
-  return null;
 }
 
 /**
  * Lưu metadata lên cloud (thực ra chỉ backup vào localStorage)
+ * Không gọi API, không có timeout, luôn thành công
  */
 export async function saveMetadataToCloud(catalogs, files) {
   try {
+    console.log(`[Metadata Sync Local] Đang backup metadata: ${catalogs?.length || 0} catalogs, ${files?.length || 0} files`);
     // Chỉ backup vào localStorage, không sync cloud
+    // Không có network call, không có timeout
     backupToLocalStorage(catalogs, files);
-    console.log('[Metadata Sync Local] Đã backup metadata');
+    console.log('[Metadata Sync Local] Đã backup metadata thành công');
     return { success: true, lastSync: Date.now() };
   } catch (error) {
     console.warn('[Metadata Sync Local] Lỗi khi backup:', error.message);
-    return null;
+    // Vẫn return success để không block UI
+    return { success: false, error: error.message };
   }
 }
 
