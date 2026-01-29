@@ -20,16 +20,11 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(() => {
+    // Scale mặc định sẽ được tính toán lại khi PDF được load
     if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-      const screenWidth = window.innerWidth;
-      // Tăng scale để render ở độ phân giải cao hơn, render chữ to hơn
-      // Logic cũ: (screenWidth - 20) / 800 => quá nhỏ
-      // Logic mới: zoom to hơn để dễ đọc
-      // Ví dụ: iPhone XR width 414px. Scale 1.5 => canvas width 621.
-      // Muốn chữ to, ta cần scale lớn hơn, ví dụ 1.8 - 2.0
-      return 2.0;
+      return 1.0; // Tạm thời, sẽ được tính toán lại
     }
-    return 1.6; // Tăng nhẹ scale desktop
+    return 1.2; // Desktop scale
   });
   const [readingMode, setReadingMode] = useState('sepia'); // Mặc định sepia giống máy đọc sách
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -192,10 +187,59 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
         pdfDocRef.current = pdf;
         setNumPages(pdf.numPages);
 
+        // Tính toán scale tự động để fit màn hình mobile
+        if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+          try {
+            const firstPage = await pdf.getPage(1);
+            const viewport = firstPage.getViewport({ scale: 1.0 }); // Scale 1.0 để lấy kích thước gốc
+            
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // Trừ padding và margin (khoảng 8px mỗi bên = 16px tổng)
+            const availableWidth = screenWidth - 16;
+            const availableHeight = screenHeight - 100; // Trừ header và controls
+            
+            // Tính scale để fit width (ưu tiên fit width để dễ đọc)
+            const scaleToFitWidth = availableWidth / viewport.width;
+            
+            // Tính scale để fit height (để đảm bảo không quá lớn)
+            const scaleToFitHeight = availableHeight / viewport.height;
+            
+            // Chọn scale nhỏ hơn để đảm bảo PDF fit vào màn hình
+            // Nhưng không nhỏ hơn 0.8 để đảm bảo chữ vẫn đọc được
+            const calculatedScale = Math.min(scaleToFitWidth, scaleToFitHeight);
+            const finalScale = Math.max(0.8, Math.min(calculatedScale, 1.5)); // Min 0.8, Max 1.5
+            
+            console.log('Auto-calculated scale for mobile:', {
+              pdfWidth: viewport.width,
+              pdfHeight: viewport.height,
+              screenWidth,
+              screenHeight,
+              availableWidth,
+              availableHeight,
+              scaleToFitWidth,
+              scaleToFitHeight,
+              calculatedScale,
+              finalScale
+            });
+            
+            setScale(finalScale);
+            
+            // Đợi scale được update trước khi render
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (err) {
+            console.error('Error calculating auto scale:', err);
+            // Fallback scale nếu có lỗi
+            setScale(1.0);
+          }
+        }
+
         setIsLoading(false);
 
         // Render trang đầu tiên sau khi PDF load xong
-        // Đợi React render xong container từ JSX
+        // Đợi React render xong container từ JSX và scale đã được update
+        // useEffect của scale sẽ tự động trigger re-render với scale mới
         setTimeout(async () => {
           if (containerRef.current && canvasContainerRef.current && pdfDocRef.current) {
             console.log('Rendering first page...', {
@@ -217,7 +261,7 @@ function PDFViewerDirect({ file, annotations, onAnnotationAdd, onAnnotationUpdat
               }
             }, 200);
           }
-        }, 500);
+        }, 600); // Delay để đảm bảo scale đã được update và useEffect đã trigger
       } catch (error) {
         console.error('Error loading PDF:', error);
         setLoadError('Không thể tải file PDF: ' + error.message);
