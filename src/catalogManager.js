@@ -156,10 +156,17 @@ export async function createCatalog(name, description = '') {
 
   return new Promise(async (resolve, reject) => {
     try {
+      // Kiểm tra xem catalog với tên này đã tồn tại chưa
+      const allCatalogs = await getAllCatalogs();
+      const existingCatalog = allCatalogs.find(c => c.name === name);
+      if (existingCatalog) {
+        reject(new Error(`Catalog với tên "${name}" đã tồn tại`));
+        return;
+      }
+
       const db = await openDBWithCatalogs();
       
       // Get max order to add new catalog at the end
-      const allCatalogs = await getAllCatalogs();
       const maxOrder = allCatalogs.length > 0 
         ? Math.max(...allCatalogs.map(c => c.order || 0))
         : -1;
@@ -178,12 +185,24 @@ export async function createCatalog(name, description = '') {
       req.onsuccess = () => {
         tx.oncomplete = async () => {
           db.close();
-          // Sync lên cloud sau khi tạo catalog
-          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+          // Sync lên cloud sau khi tạo catalog (background, không block)
+          try {
+            await syncMetadataToCloud();
+          } catch (syncError) {
+            // Silent fail - không block UI
+            console.warn('Background sync failed:', syncError.message);
+          }
           resolve(catalog);
         };
       };
-      req.onerror = () => reject(req.error);
+      req.onerror = (event) => {
+        const error = req.error || event.target.error;
+        if (error && error.name === 'ConstraintError') {
+          reject(new Error(`Catalog với tên "${name}" đã tồn tại`));
+        } else {
+          reject(error || new Error('Không thể tạo catalog'));
+        }
+      };
     } catch (error) {
       reject(error);
     }
@@ -219,8 +238,13 @@ export async function updateCatalog(catalogId, newName, newDescription = null) {
         getReq.onerror = () => reject(getReq.error);
         tx.oncomplete = async () => {
           db.close();
-          // Sync lên cloud sau khi update catalog
-          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+          // Sync lên cloud sau khi update catalog (background, không block)
+          try {
+            await syncMetadataToCloud();
+          } catch (syncError) {
+            // Silent fail - không block UI
+            console.warn('Background sync failed:', syncError.message);
+          }
         };
       })
       .catch(reject);
@@ -263,8 +287,13 @@ export async function updateCatalogOrder(catalogIds) {
           .then(() => {
             tx.oncomplete = async () => {
               db.close();
-              // Sync lên cloud sau khi update order
-              syncMetadataToCloud().catch(() => {}); // Background sync, không block
+              // Sync lên cloud sau khi update order (background, không block)
+              try {
+                await syncMetadataToCloud();
+              } catch (syncError) {
+                // Silent fail - không block UI
+                console.warn('Background sync failed:', syncError.message);
+              }
               resolve();
             };
           })
@@ -290,8 +319,13 @@ export async function deleteCatalog(catalogId) {
         req.onerror = () => reject(req.error);
         tx.oncomplete = async () => {
           db.close();
-          // Sync lên cloud sau khi xóa catalog
-          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+          // Sync lên cloud sau khi xóa catalog (background, không block)
+          try {
+            await syncMetadataToCloud();
+          } catch (syncError) {
+            // Silent fail - không block UI
+            console.warn('Background sync failed:', syncError.message);
+          }
         };
       })
       .catch(reject);
