@@ -108,15 +108,29 @@ export async function savePdf(file, catalog = null) {
     throw new Error('File không phải PDF');
   }
 
-  // Thử upload lên Vercel Blob trước
+  // Kiểm tra file size trước khi upload
+  const fileSizeMB = file.size / (1024 * 1024);
+  if (fileSizeMB > 10) {
+    console.warn(`File size ${fileSizeMB.toFixed(2)}MB quá lớn, dùng IndexedDB local mode`);
+    return savePdfLocal(file, catalog);
+  }
+
+  // Thử upload lên Vercel Blob trước với timeout
   try {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Tạo AbortController để timeout sau 55 giây (trước khi function timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout
+
     const response = await fetch('/api/upload-pdf', {
       method: 'POST',
       body: formData,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const result = await response.json();
@@ -161,6 +175,12 @@ export async function savePdf(file, catalog = null) {
       throw new Error(errorMessage);
     }
     } catch (error) {
+      // Kiểm tra xem có phải lỗi timeout hoặc abort không
+      if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('504')) {
+        console.warn('Upload timeout, dùng IndexedDB local mode:', error.message);
+        return savePdfLocal(file, catalog);
+      }
+      
       // Kiểm tra xem có phải lỗi network không
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         // Lỗi network hoặc API không tồn tại, fallback về local

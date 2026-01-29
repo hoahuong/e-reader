@@ -7,6 +7,7 @@ import { put } from '@vercel/blob';
 
 export const config = {
   runtime: 'nodejs',
+  maxDuration: 60, // Tăng timeout lên 60s cho Hobby plan (max allowed)
 };
 
 export default async function handler(request) {
@@ -59,6 +60,17 @@ export default async function handler(request) {
     );
   } catch (error) {
     console.error('Lỗi khi upload PDF:', error);
+    
+    // Kiểm tra xem có phải lỗi timeout không
+    if (error.message && (error.message.includes('timeout') || error.message.includes('504'))) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Upload timeout',
+          details: 'File quá lớn hoặc upload quá chậm. Vui lòng thử lại với file nhỏ hơn (< 5MB) hoặc kiểm tra kết nối mạng.'
+        }),
+        { status: 504, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Kiểm tra xem có phải lỗi thiếu token không
     if (error.message && error.message.includes('BLOB_READ_WRITE_TOKEN')) {
