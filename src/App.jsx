@@ -142,6 +142,9 @@ function App() {
   const handleConfirmUpload = async () => {
     if (!pendingFile) return;
 
+    setIsUploading(true);
+    setUploadError(null);
+
     // Revoke URL cũ nếu có (tránh rò rỉ bộ nhớ)
     if (fileUrlRef.current) {
       URL.revokeObjectURL(fileUrlRef.current);
@@ -152,32 +155,38 @@ function App() {
       // Lưu vào IndexedDB với catalog
       await savePdf(pendingFile, uploadCatalog);
       await refreshUploadedList();
-    } catch (e) {
-      console.error('Lỗi khi lưu PDF:', e);
-      alert('Không thể lưu PDF vào danh sách.');
-    }
 
-    const fileUrl = URL.createObjectURL(pendingFile);
-    fileUrlRef.current = fileUrl;
-    setCurrentPdfId(null);
-    setFile(fileUrl);
-    setFileName(pendingFile.name);
+      // Nếu upload thành công, mở file để đọc
+      const fileUrl = URL.createObjectURL(pendingFile);
+      fileUrlRef.current = fileUrl;
+      setCurrentPdfId(null);
+      setFile(fileUrl);
+      setFileName(pendingFile.name);
 
-    const fileAnnotations = localStorage.getItem(`pdf-annotations-${pendingFile.name}`);
-    if (fileAnnotations) {
-      try {
-        setAnnotations(JSON.parse(fileAnnotations));
-      } catch (e) {
-        console.error('Lỗi khi tải ghi chú cho file:', e);
+      const fileAnnotations = localStorage.getItem(`pdf-annotations-${pendingFile.name}`);
+      if (fileAnnotations) {
+        try {
+          setAnnotations(JSON.parse(fileAnnotations));
+        } catch (e) {
+          console.error('Lỗi khi tải ghi chú cho file:', e);
+          setAnnotations([]);
+        }
+      } else {
         setAnnotations([]);
       }
-    } else {
-      setAnnotations([]);
-    }
 
-    setShowUploadModal(false);
-    setPendingFile(null);
-    setUploadCatalog(null);
+      setShowUploadModal(false);
+      setPendingFile(null);
+      setUploadCatalog(null);
+      setUploadError(null);
+    } catch (e) {
+      console.error('Lỗi khi lưu PDF:', e);
+      const errorMessage = e.message || 'Không thể lưu PDF vào danh sách.';
+      setUploadError(errorMessage);
+      // Không đóng modal để user có thể thử lại hoặc xem lỗi
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSelectFromList = async (id, name) => {
