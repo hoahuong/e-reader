@@ -26,27 +26,40 @@ export async function loadMetadataFromCloud() {
  */
 export async function saveMetadataToCloud(catalogs, files) {
   try {
+    const payload = {
+      catalogs: catalogs || [],
+      files: files || [],
+      lastSync: Date.now(),
+    };
+    
+    console.log(`[Metadata Sync] Đang lưu metadata lên cloud: ${payload.catalogs.length} catalogs, ${payload.files.length} files`);
+    
     const response = await fetch('/api/save-metadata', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        catalogs: catalogs || [],
-        files: files || [],
-        lastSync: Date.now(),
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || 'Không thể lưu metadata');
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || `HTTP ${response.status}` };
+      }
+      console.error(`[Metadata Sync] API trả về lỗi ${response.status}:`, errorData);
+      throw new Error(errorData.error || errorData.details || 'Không thể lưu metadata');
     }
 
     const result = await response.json();
+    console.log('[Metadata Sync] Lưu thành công:', result);
     return result;
   } catch (error) {
-    console.warn('Không thể lưu metadata lên cloud:', error.message);
+    console.error('[Metadata Sync] Lỗi khi lưu metadata lên cloud:', error);
+    console.error('[Metadata Sync] Chi tiết lỗi:', error.message, error.stack);
     // Không throw error để không block UI, chỉ log warning
     return null;
   }
@@ -56,9 +69,13 @@ export async function saveMetadataToCloud(catalogs, files) {
  * Sync metadata từ cloud vào IndexedDB local
  */
 export async function syncMetadataToLocal(metadata) {
-  if (!metadata) return;
+  if (!metadata) {
+    console.log('[Metadata Sync] Không có metadata để sync');
+    return;
+  }
 
   const { catalogs = [], files = [] } = metadata;
+  console.log(`[Metadata Sync] Bắt đầu sync vào local: ${catalogs.length} catalogs, ${files.length} files`);
 
   // Import các hàm cần thiết
   const { openDB } = await import('./pdfStorage');
@@ -125,8 +142,13 @@ export async function syncMetadataToLocal(metadata) {
           }
         };
         clearReq.onerror = () => reject(clearReq.error);
-        tx.oncomplete = () => db.close();
+        tx.oncomplete = () => {
+          db.close();
+          console.log(`[Metadata Sync] Đã sync ${catalogs.length} catalogs vào local`);
+        };
       });
+    } else {
+      console.log('[Metadata Sync] Không có catalogs để sync');
     }
 
     // Sync files metadata
@@ -166,11 +188,19 @@ export async function syncMetadataToLocal(metadata) {
           }
         };
         localReq.onerror = () => reject(localReq.error);
-        tx.oncomplete = () => db.close();
+        tx.oncomplete = () => {
+          db.close();
+          console.log(`[Metadata Sync] Đã sync ${files.length} files vào local`);
+        };
       });
+    } else {
+      console.log('[Metadata Sync] Không có files để sync');
     }
+    
+    console.log('[Metadata Sync] Hoàn thành sync metadata vào local');
   } catch (error) {
-    console.error('Lỗi khi sync metadata vào local:', error);
+    console.error('[Metadata Sync] Lỗi khi sync metadata vào local:', error);
+    console.error('[Metadata Sync] Chi tiết lỗi:', error.message, error.stack);
     throw error;
   }
 }

@@ -19,10 +19,14 @@ export default async function handler(request) {
   }
 
   try {
+    console.log('[API save-metadata] Bắt đầu lưu metadata...');
     const data = await request.json();
     const { catalogs, files, lastSync } = data;
 
+    console.log(`[API save-metadata] Nhận được: ${catalogs?.length || 0} catalogs, ${files?.length || 0} files`);
+
     if (!catalogs || !files) {
+      console.error('[API save-metadata] Thiếu dữ liệu catalogs hoặc files');
       return new Response(
         JSON.stringify({ error: 'Thiếu dữ liệu catalogs hoặc files' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -41,11 +45,15 @@ export default async function handler(request) {
     const jsonString = JSON.stringify(metadata);
     const blob = new Blob([jsonString], { type: 'application/json' });
 
+    console.log(`[API save-metadata] Đang upload lên blob storage... (size: ${blob.size} bytes)`);
+
     // Upload lên Vercel Blob Storage
     const result = await put('metadata/metadata.json', blob, {
       access: 'public',
       contentType: 'application/json',
     });
+
+    console.log(`[API save-metadata] Upload thành công tại: ${result.url}`);
 
     return new Response(
       JSON.stringify({
@@ -56,7 +64,8 @@ export default async function handler(request) {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Lỗi khi lưu metadata:', error);
+    console.error('[API save-metadata] Lỗi khi lưu metadata:', error);
+    console.error('[API save-metadata] Chi tiết:', error.message, error.stack);
     
     if (error.message && error.message.includes('BLOB_READ_WRITE_TOKEN')) {
       return new Response(
