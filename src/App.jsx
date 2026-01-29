@@ -22,6 +22,8 @@ function App() {
   const [uploadCatalog, setUploadCatalog] = useState(null); // Catalog khi upload
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
+  const [uploadError, setUploadError] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const headerTimeoutRef = useRef(null);
@@ -513,7 +515,14 @@ function LanguageRoutes({
 
                     {/* Upload Modal với Catalog Selector */}
                     {showUploadModal && pendingFile && (
-                      <div className="upload-modal-overlay" onClick={() => setShowUploadModal(false)}>
+                      <div className="upload-modal-overlay" onClick={() => {
+                        if (!isUploading) {
+                          setShowUploadModal(false);
+                          setPendingFile(null);
+                          setUploadCatalog(null);
+                          setUploadError(null);
+                        }
+                      }}>
                         <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
                           <h3>📤 Upload PDF</h3>
                           <div className="upload-modal-content">
@@ -523,16 +532,32 @@ function LanguageRoutes({
                               selectedCatalog={uploadCatalog}
                               onCatalogChange={setUploadCatalog}
                             />
+                            {uploadError && (
+                              <div className="upload-error-message">
+                                ⚠️ <strong>Lỗi:</strong> {uploadError}
+                                <br />
+                                <small>Vui lòng thử lại hoặc kiểm tra kết nối mạng.</small>
+                              </div>
+                            )}
                           </div>
                           <div className="upload-modal-actions">
-                            <button onClick={handleConfirmUpload} className="confirm-upload-btn">
-                              ✅ Upload
+                            <button 
+                              onClick={handleConfirmUpload} 
+                              className="confirm-upload-btn"
+                              disabled={isUploading}
+                            >
+                              {isUploading ? '⏳ Đang upload...' : '✅ Upload'}
                             </button>
-                            <button onClick={() => {
-                              setShowUploadModal(false);
-                              setPendingFile(null);
-                              setUploadCatalog(null);
-                            }} className="cancel-upload-btn">
+                            <button 
+                              onClick={() => {
+                                setShowUploadModal(false);
+                                setPendingFile(null);
+                                setUploadCatalog(null);
+                                setUploadError(null);
+                              }} 
+                              className="cancel-upload-btn"
+                              disabled={isUploading}
+                            >
                               ❌ Hủy
                             </button>
                           </div>

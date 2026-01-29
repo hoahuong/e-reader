@@ -142,14 +142,34 @@ export async function savePdf(file, catalog = null) {
         tx.oncomplete = () => db.close();
       });
     } else {
-      // API không khả dụng, fallback về local
-      console.warn('API route không khả dụng, dùng IndexedDB local mode');
-      return savePdfLocal(file);
+      // API trả về lỗi, lấy chi tiết lỗi từ response
+      let errorMessage = 'Không thể upload PDF';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.details || errorMessage;
+      } catch (e) {
+        errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+      }
+      
+      // Nếu là lỗi server (500), fallback về local
+      if (response.status >= 500) {
+        console.warn('API route lỗi server, dùng IndexedDB local mode:', errorMessage);
+        return savePdfLocal(file, catalog);
+      }
+      
+      // Nếu là lỗi client (400, 401, 403, etc.), throw error để hiển thị cho user
+      throw new Error(errorMessage);
     }
     } catch (error) {
-      // Lỗi network hoặc API không tồn tại, fallback về local
-      console.warn('Không thể kết nối API, dùng IndexedDB local mode:', error.message);
-      return savePdfLocal(file, catalog);
+      // Kiểm tra xem có phải lỗi network không
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        // Lỗi network hoặc API không tồn tại, fallback về local
+        console.warn('Không thể kết nối API, dùng IndexedDB local mode:', error.message);
+        return savePdfLocal(file, catalog);
+      }
+      
+      // Nếu là lỗi từ API (đã được throw ở trên), re-throw để hiển thị cho user
+      throw error;
     }
 }
 
