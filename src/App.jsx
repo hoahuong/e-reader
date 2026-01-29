@@ -156,6 +156,12 @@ function App() {
       await savePdf(pendingFile, uploadCatalog);
       await refreshUploadedList();
 
+      // Đóng modal TRƯỚC khi set file để tránh modal che PDF
+      setShowUploadModal(false);
+      setPendingFile(null);
+      setUploadCatalog(null);
+      setUploadError(null);
+
       // Nếu upload thành công, mở file để đọc
       const fileUrl = URL.createObjectURL(pendingFile);
       fileUrlRef.current = fileUrl;
@@ -174,11 +180,6 @@ function App() {
       } else {
         setAnnotations([]);
       }
-
-      setShowUploadModal(false);
-      setPendingFile(null);
-      setUploadCatalog(null);
-      setUploadError(null);
     } catch (e) {
       console.error('Lỗi khi lưu PDF:', e);
       const errorMessage = e.message || 'Không thể lưu PDF vào danh sách.';
@@ -555,14 +556,19 @@ function LanguageRoutes({
 
                     {/* Upload Modal với Catalog Selector */}
                     {showUploadModal && pendingFile && (
-                      <div className="upload-modal-overlay" onClick={() => {
-                        if (!isUploading) {
-                          setShowUploadModal(false);
-                          setPendingFile(null);
-                          setUploadCatalog(null);
-                          setUploadError(null);
-                        }
-                      }}>
+                      <div 
+                        className="upload-modal-overlay" 
+                        onClick={(e) => {
+                          // Chỉ đóng khi click vào overlay, không phải modal content
+                          if (e.target === e.currentTarget && !isUploading) {
+                            setShowUploadModal(false);
+                            setPendingFile(null);
+                            setUploadCatalog(null);
+                            setUploadError(null);
+                            setIsUploading(false);
+                          }
+                        }}
+                      >
                         <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
                           <h3>📤 Upload PDF</h3>
                           <div className="upload-modal-content">
@@ -590,10 +596,13 @@ function LanguageRoutes({
                             </button>
                             <button 
                               onClick={() => {
-                                setShowUploadModal(false);
-                                setPendingFile(null);
-                                setUploadCatalog(null);
-                                setUploadError(null);
+                                if (!isUploading) {
+                                  setShowUploadModal(false);
+                                  setPendingFile(null);
+                                  setUploadCatalog(null);
+                                  setUploadError(null);
+                                  setIsUploading(false);
+                                }
                               }} 
                               className="cancel-upload-btn"
                               disabled={isUploading}
