@@ -62,7 +62,6 @@ export async function syncMetadataToLocal(metadata) {
 
   // Import các hàm cần thiết
   const { openDB } = await import('./pdfStorage');
-  const { openDBWithCatalogs } = await import('./catalogManager');
 
   try {
     // Sync catalogs
