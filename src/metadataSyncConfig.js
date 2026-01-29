@@ -12,7 +12,7 @@
 // 'vercel-blob': Vercel Blob Storage (cần BLOB_READ_WRITE_TOKEN)
 // 'github': GitHub API Storage (cần GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
 // 'local': Local Storage only - IndexedDB + localStorage backup (không cần config)
-const STORAGE_TYPE = 'local'; // 'vercel-blob' | 'github' | 'local'
+const STORAGE_TYPE = 'github'; // 'vercel-blob' | 'github' | 'local'
 
 let metadataSyncModule = null;
 
