@@ -1,0 +1,2560 @@
+/* E-reader Mode Styles */
+.pdf-viewer-container.ereader-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f5f1e8;
+  position: relative;
+  transition: background-color 0.3s ease;
+  overflow: hidden;
+}
+
+/* Main content wrapper để chứa PDF và Sidebar */
+.pdf-viewer-container.ereader-mode>.pdf-content-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1;
+  overflow: hidden;
+  overflow-x: hidden;
+  /* Ngăn scroll ngang */
+  position: relative;
+  /* KHÔNG set padding-top ở đây - sẽ được set trong JSX inline style */
+  /* Inline style có priority cao hơn CSS nên sẽ override */
+  /* Đảm bảo không có padding-top mặc định tạo khoảng trống 36px */
+  padding-top: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  z-index: 1;
+  /* Đảm bảo content ở dưới controls */
+  /* Đảm bảo flex children sát với top */
+  align-items: stretch !important;
+  align-content: flex-start !important;
+}
+
+/* Đảm bảo PDFViewerDirect không bị ảnh hưởng bởi các CSS rules khác */
+.pdf-viewer-direct .pdf-content-wrapper {
+  /* KHÔNG set padding-top ở đây - sẽ được set trong JSX inline style */
+  padding-top: 0 !important;
+}
+
+/* Reading Modes */
+.ereader-mode.day {
+  background: #ffffff;
+}
+
+.ereader-mode.sepia {
+  background: #f5f1e8;
+}
+
+.ereader-mode.night {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+.ereader-mode.night .pdf-document-wrapper {
+  background: #2a2a2a;
+}
+
+.ereader-mode.night .ereader-page {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+/* Fullscreen Mode */
+.pdf-viewer-container.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+}
+
+.pdf-viewer-container.fullscreen .annotations-sidebar {
+  display: none;
+}
+
+.pdf-viewer-container.fullscreen .pdf-content-wrapper {
+  /* Fullscreen không cần wrapper */
+}
+
+.pdf-viewer-container.fullscreen .pdf-content {
+  /* Fullscreen: PDF chiếm toàn bộ */
+}
+
+/* Controls */
+.ereader-controls {
+  /* Base class - không set position ở đây, sẽ được override bởi top-controls hoặc bottom-controls */
+  /* KHÔNG set left, right ở đây vì sẽ gây vấn đề với position: relative */
+  /* Z-index sẽ được điều khiển bởi inline style trong JSX để tránh che phủ PDF */
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  /* QUAN TRỌNG: Đảm bảo không có CSS nào override height thành 100% hoặc 100vh */
+  /* KHÔNG set height, max-height, min-height ở đây - để các class con điều khiển */
+}
+
+.ereader-controls.top-controls,
+#pdf-top-controls {
+  /* Relative để đẩy PDF xuống thay vì chồng lên */
+  position: relative !important;
+  width: 100% !important;
+  /* QUAN TRỌNG: Height sẽ được điều khiển động trong JSX inline style */
+  /* Đảm bảo KHÔNG có height: 100% hoặc height: 100vh */
+  /* Overflow sẽ được điều khiển bởi inline style trong JSX để tránh che phủ màn hình */
+  /* QUAN TRỌNG: Đảm bảo không có CSS nào override height thành 100% hoặc 100vh */
+  /* Height, min-height, max-height sẽ được điều khiển bởi inline style trong JSX (36px mobile, 40px desktop - bằng chiều cao control bên ngoài) */
+  /* KHÔNG set height, min-height, max-height ở đây để inline style điều khiển hoàn toàn */
+  /* QUAN TRỌNG: Đảm bảo không có CSS nào set height thành 100% hoặc 100vh */
+  /* KHÔNG set height, min-height, max-height ở đây - để inline style điều khiển hoàn toàn */
+  /* Top, left, right sẽ được điều khiển bởi inline style trong JSX */
+  /* Background và opacity sẽ được điều khiển bởi inline style trong JSX */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px;
+  /* Z-index sẽ được điều khiển bởi inline style trong JSX */
+  /* QUAN TRỌNG: Đảm bảo controls không shrink và không overlay */
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  pointer-events: auto;
+  /* Transition sẽ được điều khiển bởi inline style trong JSX */
+  /* Đảm bảo không có margin/padding gây lệch */
+  margin: 0 !important;
+  /* QUAN TRỌNG: Đảm bảo controls luôn ở top, không wrap xuống bottom */
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  /* Bỏ viền bên trái và bên phải */
+  border-left: none !important;
+  border-right: none !important;
+}
+
+/* Chỉ làm background khi hover - giống máy đọc sách */
+.ereader-controls.top-controls:hover,
+#pdf-top-controls:hover {
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  opacity: 1 !important;
+  /* Hiện rõ khi hover */
+  /* QUAN TRỌNG: Đảm bảo position vẫn là relative khi hover để không che PDF */
+  position: relative !important;
+  /* Z-index sẽ được điều khiển bởi inline style trong JSX */
+  /* QUAN TRỌNG: Đảm bảo không có CSS nào override height thành 100% hoặc 100vh khi hover */
+  /* Height, min-height, max-height sẽ được điều khiển bởi inline style trong JSX (36px mobile, 40px desktop - bằng chiều cao control bên ngoài) */
+  /* KHÔNG set height, min-height, max-height ở đây để inline style điều khiển hoàn toàn */
+  /* QUAN TRỌNG: KHÔNG set top, left, right ở đây - để inline style điều khiển hoàn toàn */
+  /* Đảm bảo controls chỉ che đúng chiều cao của nó (72px mobile, 80px desktop), không che toàn màn hình */
+  /* Bỏ viền bên trái và bên phải */
+  border-left: none !important;
+  border-right: none !important;
+  /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+}
+
+/* Trên mobile, top controls nhỏ gọn hơn */
+@media (max-width: 768px) {
+  .ereader-controls.top-controls {
+    /* Relative để đẩy PDF xuống thay vì chồng lên */
+    position: relative !important;
+    width: 100% !important;
+    /* Height sẽ được điều khiển động trong JSX inline style */
+    /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+    gap: 4px !important;
+    /* Background và z-index sẽ được điều khiển bởi inline style trong JSX */
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    /* Giảm kích thước để không che nhiều */
+  }
+
+  .controls-left,
+  .controls-right {
+    gap: 4px;
+  }
+
+  .icon-btn,
+  .minimal-btn {
+    padding: 6px 10px !important;
+    font-size: 14px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .icon-btn:hover,
+  .minimal-btn:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    transform: scale(1.05) !important;
+  }
+
+  .icon-btn:active,
+  .minimal-btn:active {
+    transform: scale(0.95) !important;
+  }
+
+  .page-info-minimal {
+    font-size: 11px;
+    min-width: 50px;
+  }
+
+  .mode-btn {
+    padding: 2px 6px;
+    font-size: 14px;
+  }
+
+  .progress-bar-minimal {
+    max-width: 150px;
+    height: 2px !important;
+    max-height: 2px !important;
+    min-height: 2px !important;
+  }
+
+  .progress-fill-minimal {
+    max-height: 2px !important;
+  }
+}
+
+/* QUAN TRỌNG: CSS rule với specificity cao để đảm bảo height không bị override */
+.ereader-controls.top-controls.visible,
+#pdf-top-controls.visible,
+.ereader-controls.top-controls.visible:hover,
+#pdf-top-controls.visible:hover {
+  /* Opacity và height được điều khiển bởi inline style trong JSX */
+  pointer-events: auto;
+  /* QUAN TRỌNG: Đảm bảo không có CSS nào override height thành 100% hoặc 100vh */
+  /* Height, min-height, max-height sẽ được điều khiển bởi inline style trong JSX (36px mobile, 40px desktop - bằng chiều cao control bên ngoài) */
+  /* KHÔNG set height, min-height, max-height ở đây để inline style điều khiển hoàn toàn */
+  /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+  /* Đảm bảo position vẫn là relative khi hover để không che PDF */
+  position: relative !important;
+  /* Z-index sẽ được điều khiển bởi inline style trong JSX */
+}
+
+.ereader-controls.top-controls.hidden,
+#pdf-top-controls.hidden {
+  /* Opacity và height được điều khiển bởi inline style trong JSX */
+  /* KHÔNG set opacity ở đây để inline style có thể điều khiển */
+  pointer-events: none;
+  /* Đảm bảo không có CSS override height khi hidden */
+  height: 0 !important;
+  max-height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.controls-left,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Đảm bảo không có background che nội dung */
+  background: transparent;
+  padding: 0;
+  /* QUAN TRỌNG: Giới hạn chiều cao để không làm controls cao quá */
+  height: 100%;
+  max-height: 100%;
+  flex-shrink: 0;
+  /* Không cho shrink */
+  /* Đảm bảo các phần tử con có pointer events */
+  pointer-events: auto;
+}
+
+.controls-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  /* Đảm bảo không block pointer events của content */
+  pointer-events: auto;
+  /* QUAN TRỌNG: Giới hạn chiều cao cứng để không làm controls cao quá */
+  height: auto !important;
+  max-height: 56px !important;
+  /* Không được cao quá chiều cao của controls */
+  min-height: 0 !important;
+  overflow: hidden;
+  align-self: center !important;
+  /* Center theo chiều dọc, không stretch */
+  flex-shrink: 1;
+  /* Cho phép shrink nếu cần */
+  /* Đảm bảo các phần tử con không làm cao quá */
+  box-sizing: border-box;
+}
+
+.page-info-minimal {
+  color: rgba(255, 255, 255, 0.95);
+  /* Tăng độ sáng để dễ nhìn */
+  font-size: 13px;
+  font-weight: 600;
+  /* Tăng độ đậm */
+  min-width: 60px;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  /* Thêm shadow để dễ đọc */
+}
+
+.progress-bar-minimal {
+  width: 100%;
+  max-width: 300px;
+  height: 3px !important;
+  /* QUAN TRỌNG: Giới hạn chiều cao cứng */
+  max-height: 3px !important;
+  min-height: 3px !important;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+  /* Không cho shrink */
+}
+
+.progress-fill-minimal {
+  height: 100% !important;
+  max-height: 3px !important;
+  background: rgba(255, 255, 255, 0.8);
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.reading-mode-buttons {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  /* Tăng độ sáng */
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.mode-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.mode-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mode-btn.active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.icon-btn,
+.minimal-btn {
+  padding: 6px 10px;
+  /* Làm button rõ ràng hơn để dễ nhìn khi không có background */
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Đảm bảo button có shadow để nổi bật */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.icon-btn:hover,
+.minimal-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.icon-btn.active {
+  background: rgba(74, 144, 226, 0.3);
+  border-color: rgba(74, 144, 226, 0.5);
+}
+
+.bookmark-btn-minimal.bookmarked {
+  background: rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.ereader-controls.bottom-controls {
+  /* Position sẽ được điều khiển bởi inline style trong JSX */
+  /* Desktop: relative, Mobile: fixed */
+  /* KHÔNG set !important để cho inline style có thể override */
+  position: relative;
+  /* Default, sẽ được override bởi inline style trên mobile */
+  width: 100%;
+  padding: 12px 20px;
+  /* Giống máy đọc sách: trong suốt, chỉ hiện khi cần */
+  background: transparent !important;
+  backdrop-filter: none !important;
+  z-index: 100;
+  opacity: 0.3;
+  /* Mờ khi không hover */
+  transition: opacity 0.3s ease !important;
+}
+
+.ereader-controls.bottom-controls.visible {
+  opacity: 0.3;
+  /* Giống máy đọc sách: mờ khi không hover */
+  transform: translateY(0);
+}
+
+.ereader-controls.bottom-controls.visible:hover {
+  opacity: 1 !important;
+  /* Hiện rõ khi hover */
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.ereader-controls.bottom-controls.hidden {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+/* Bottom controls trên mobile - Giống Kindle: hiển thị ở bottom */
+@media (max-width: 768px) {
+  .ereader-controls.bottom-controls {
+    display: flex !important;
+    /* Hiển thị trên mobile */
+    /* Position sẽ được điều khiển bởi inline style: fixed để luôn ở bottom */
+    /* KHÔNG set !important để cho inline style có thể override */
+    /* position sẽ được set thành fixed bởi isMobile check trong JSX */
+    width: 100% !important;
+    padding: 8px 12px !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+    max-height: 60px !important;
+    z-index: 100 !important;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Điều chỉnh padding bottom của container khi có bottom controls */
+  .pdf-canvas-container-direct {
+    padding-bottom: 80px !important;
+    /* Padding cho bottom controls */
+    /* Không có padding-top để PDF sát với top */
+    padding-top: 0px !important;
+  }
+
+  /* Top controls - Relative để đẩy PDF xuống */
+  .ereader-controls.top-controls,
+  #pdf-top-controls {
+    /* Relative để đẩy PDF xuống thay vì chồng lên */
+    position: relative !important;
+    /* Top, left, right sẽ được điều khiển bởi inline style trong JSX */
+    width: 100% !important;
+    /* Height sẽ được điều khiển động trong JSX inline style */
+    /* Height, min-height, max-height sẽ được điều khiển bởi inline style trong JSX (36px mobile, 40px desktop - bằng chiều cao control bên ngoài) */
+    /* KHÔNG set height, min-height, max-height ở đây để inline style điều khiển hoàn toàn */
+    /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+    /* QUAN TRỌNG: Đảm bảo không có CSS nào set height thành 100% hoặc 100vh */
+    /* KHÔNG set height, min-height, max-height ở đây - để inline style điều khiển hoàn toàn */
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    /* Bỏ viền bên trái và bên phải */
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Chỉ hiện background khi hover trên mobile */
+  .ereader-controls.top-controls:hover {
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(12px) !important;
+    /* QUAN TRỌNG: Đảm bảo position vẫn là relative khi hover */
+    position: relative !important;
+    /* Z-index sẽ được điều khiển bởi inline style trong JSX */
+    /* Bỏ viền bên trái và bên phải */
+    border-left: none !important;
+    border-right: none !important;
+    /* QUAN TRỌNG: KHÔNG set height, top, left, right ở đây - để inline style điều khiển hoàn toàn */
+    /* Đảm bảo controls chỉ che đúng chiều cao của nó (72px mobile), không che toàn màn hình */
+    /* Bỏ viền bên trái và bên phải */
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Giảm kích thước các button trên mobile */
+  .icon-btn,
+  .minimal-btn {
+    padding: 6px 10px !important;
+    font-size: 14px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .icon-btn:hover,
+  .minimal-btn:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    transform: scale(1.05) !important;
+  }
+
+  .icon-btn:active,
+  .minimal-btn:active {
+    transform: scale(0.95) !important;
+  }
+
+  .mode-btn {
+    padding: 6px 10px !important;
+    font-size: 16px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .mode-btn:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .mode-btn.active {
+    background: rgba(255, 255, 255, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+
+  .nav-btn-top {
+    padding: 6px 12px !important;
+    font-size: 16px !important;
+    min-width: 40px !important;
+    height: 36px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .nav-btn-top:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    transform: scale(1.05) !important;
+  }
+
+  .nav-btn-top:disabled {
+    opacity: 0.4 !important;
+  }
+
+  .page-info-minimal {
+    font-size: 10px !important;
+    padding: 0 4px !important;
+  }
+
+  .progress-bar-minimal {
+    max-width: 100px !important;
+    height: 2px !important;
+  }
+}
+
+.bottom-controls-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.nav-btn-minimal {
+  padding: 8px 16px;
+  /* Giống Kindle: màu sáng hơn để dễ nhìn */
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 600;
+  transition: all 0.2s;
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.nav-btn-minimal:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.nav-btn-minimal:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.progress-info-minimal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.progress-bar-bottom {
+  width: 100%;
+  max-width: 400px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill-bottom {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+/* Trên desktop, top controls không cần offset vì không có minimal header */
+/* QUAN TRỌNG: KHÔNG set top ở đây để JSX inline style có hiệu lực */
+@media (min-width: 769px) {
+  .ereader-controls.top-controls {
+    /* Top sẽ được set trong JSX inline style: 40px (dưới header minimal) */
+    /* KHÔNG set top ở đây để không override inline style */
+  }
+}
+
+.ereader-controls.bottom-controls {
+  bottom: 0;
+}
+
+.ereader-controls.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ereader-controls.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.controls-left .page-info {
+  margin-right: 8px;
+  /* Khoảng cách giữa số trang và các phần tử khác */
+}
+
+.controls-center {
+  flex: 2;
+  max-width: 400px;
+  margin: 0 20px;
+}
+
+.controls-right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  /* Đảm bảo không wrap */
+  flex-shrink: 0;
+  /* Không cho shrink */
+}
+
+.page-info {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+}
+
+.controls-right .progress-info {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+  padding: 0 4px;
+  /* Padding nhỏ để tạo khoảng cách */
+  display: inline-flex;
+  align-items: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4a90e2;
+  transition: width 0.3s ease;
+}
+
+.reading-mode-selector {
+  display: inline-flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px;
+  border-radius: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.reading-mode-selector button {
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+}
+
+.reading-mode-selector button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.reading-mode-selector button.active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.bookmark-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.bookmark-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bookmark-btn.bookmarked {
+  background: rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.controls-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 14px;
+}
+
+.zoom-controls .icon-btn {
+  padding: 6px 10px;
+}
+
+/* Content Area */
+.pdf-content.ereader-content {
+  flex: 1;
+  overflow-x: hidden;
+  /* Ngăn scroll ngang */
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+  position: relative;
+  cursor: pointer;
+  min-width: 0;
+  /* Cho phép flex item shrink */
+  max-width: 100%;
+  /* Không cho phép tràn ra ngoài */
+  width: 100%;
+  touch-action: pan-y pinch-zoom;
+  /* Cho phép swipe và zoom */
+  -webkit-overflow-scrolling: touch;
+  /* Smooth scrolling trên iOS */
+  padding-bottom: 80px;
+  /* Thêm padding bottom mặc định để tránh bị che */
+  user-select: text;
+  /* Cho phép chọn text */
+  -webkit-user-select: text;
+  -webkit-tap-highlight-color: transparent;
+  /* Tắt highlight khi tap trên mobile */
+  box-sizing: border-box;
+}
+
+.pdf-document-wrapper {
+  position: relative;
+  display: inline-block;
+  background: #525252;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+  /* Đảm bảo wrapper luôn có background để tránh nhấp nháy */
+  min-height: 100px;
+}
+
+/* Đã xóa hiệu ứng 3D và shadow animation */
+
+/* Container cho PDF content */
+.pdf-content.ereader-content {
+  /* Đã xóa perspective 3D */
+}
+
+/* Đã xóa tất cả animation lật trang */
+
+/* Container cho trang PDF */
+.page-container {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+
+/* Đảm bảo page-container có position relative để các page absolute có thể đặt đúng */
+.pdf-document-wrapper {
+  position: relative;
+  overflow: visible;
+  /* Cho phép shadow và transform vượt ra ngoài */
+}
+
+/* Đã xóa tất cả CSS liên quan đến animation */
+
+/* Ẩn tất cả loading spinner từ react-pdf */
+.react-pdf__Page__canvas+div[class*="loading"],
+.react-pdf__Page__textContent+div[class*="loading"],
+.react-pdf__Page__annotationLayer+div[class*="loading"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Thêm hiệu ứng gradient shadow cho trang khi lật */
+.pdf-document-wrapper.page-prev::before,
+.pdf-document-wrapper.page-next::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+/* Đã xóa animation shadow */
+
+.page-container {
+  position: relative;
+  display: inline-block;
+  background: white;
+}
+
+.ereader-mode.sepia .page-container {
+  background: #F5F0E1;
+}
+
+.ereader-mode.night .page-container {
+  background: #1a1a1a;
+}
+
+.pdf-page.ereader-page {
+  display: block;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  background: white;
+  max-width: 100%;
+  height: auto;
+}
+
+.pdf-page.ereader-page canvas {
+  display: block;
+}
+
+.ereader-mode.night .pdf-page.ereader-page {
+  background: #2a2a2a;
+}
+
+/* Loading indicator */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  min-height: 400px;
+  text-align: center;
+}
+
+/* Ẩn loading khi đang chuyển trang */
+.pdf-document-wrapper:has(.page-container[data-changing="true"]) .loading-container {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(74, 144, 226, 0.2);
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.ereader-mode.night .loading-text {
+  color: #e0e0e0;
+}
+
+.loading-subtext {
+  font-size: 14px;
+  color: #666;
+}
+
+.ereader-mode.night .loading-subtext {
+  color: #aaa;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+  font-size: 16px;
+}
+
+.error-message {
+  padding: 40px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.ereader-mode.night .error-message {
+  background: rgba(42, 42, 42, 0.95);
+  color: #e0e0e0;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-text {
+  font-size: 16px;
+  color: #d32f2f;
+  margin-bottom: 16px;
+}
+
+.ereader-mode.night .error-text {
+  color: #ff6b6b;
+}
+
+.error-retry-btn {
+  padding: 10px 20px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.error-retry-btn:hover {
+  background: #357abd;
+}
+
+/* Annotation styles */
+.annotation-marker {
+  position: absolute;
+  cursor: pointer;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+}
+
+.annotation-icon {
+  font-size: 24px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  transition: transform 0.2s;
+}
+
+.annotation-marker:hover .annotation-icon {
+  transform: scale(1.2);
+}
+
+.annotation-popup {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 150px;
+  max-width: 250px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.annotation-marker:hover .annotation-popup {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.annotation-text {
+  font-size: 13px;
+  color: #333;
+  word-wrap: break-word;
+}
+
+.delete-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.delete-btn:hover {
+  background: #cc0000;
+}
+
+.annotation-form {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 2px solid #4a90e2;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 250px;
+  max-width: 350px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.annotation-form textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.annotation-form textarea:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.annotation-form-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.annotation-form-buttons button {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.annotation-form-buttons button:first-child {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.annotation-form-buttons button:first-child:hover {
+  background: #357abd;
+}
+
+.annotation-form-buttons button:last-child:hover {
+  background: #f0f0f0;
+}
+
+/* Sidebar */
+.annotations-sidebar {
+  width: 300px;
+  min-width: 300px;
+  background: #fff;
+  border-left: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  overflow: hidden;
+  transition: width 0.3s ease, min-width 0.3s ease;
+}
+
+.annotations-sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f9f9f9;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  flex: 1;
+}
+
+.annotations-sidebar.collapsed .sidebar-header h3 {
+  display: none;
+}
+
+.sidebar-toggle {
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.annotations-sidebar.collapsed .sidebar-toggle {
+  position: absolute;
+  right: -30px;
+  top: 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  padding: 8px 4px;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.ereader-mode.night .annotations-sidebar {
+  background: #2a2a2a;
+  border-left-color: #444;
+  color: #e0e0e0;
+}
+
+/* Sidebar content - ẩn khi collapsed */
+.annotations-sidebar.collapsed .annotations-list,
+.annotations-sidebar.collapsed .bookmarks-list {
+  display: none;
+}
+
+.ereader-mode.night .sidebar-header {
+  background: #333;
+  border-bottom-color: #444;
+}
+
+.ereader-mode.night .sidebar-header h3 {
+  color: #e0e0e0;
+}
+
+.annotations-list,
+.bookmarks-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.no-annotations {
+  text-align: center;
+  color: #999;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.annotation-item,
+.bookmark-item {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ereader-mode.night .annotation-item,
+.ereader-mode.night .bookmark-item {
+  background: #333;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.annotation-item:hover,
+.bookmark-item:hover {
+  background: #f0f0f0;
+  border-color: #4a90e2;
+}
+
+.ereader-mode.night .annotation-item:hover,
+.ereader-mode.night .bookmark-item:hover {
+  background: #3a3a3a;
+  border-color: #4a90e2;
+}
+
+.annotation-item.active,
+.bookmark-item.active {
+  background: #e3f2fd;
+  border-color: #4a90e2;
+}
+
+.ereader-mode.night .annotation-item.active,
+.ereader-mode.night .bookmark-item.active {
+  background: #2a3a4a;
+  border-color: #4a90e2;
+}
+
+.annotation-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.annotation-page {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a90e2;
+}
+
+.delete-btn-small {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn-small:hover {
+  background: #cc0000;
+}
+
+.annotation-item-text {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 6px;
+  word-wrap: break-word;
+}
+
+.ereader-mode.night .annotation-item-text {
+  color: #e0e0e0;
+}
+
+.annotation-item-date {
+  font-size: 11px;
+  color: #999;
+}
+
+.ereader-mode.night .annotation-item-date {
+  color: #aaa;
+}
+
+/* Click Hints */
+.click-hints {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 40px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.3;
+  transition: opacity 0.3s;
+}
+
+.click-hints:hover {
+  opacity: 0.6;
+}
+
+.hint-left,
+.hint-right {
+  color: white;
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+/* Text Selection Menu */
+.text-selection-menu {
+  margin-top: -10px;
+}
+
+.selection-menu-content {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+}
+
+.ereader-mode.night .selection-menu-content {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.selected-text-preview {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  padding: 6px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-wrap: break-word;
+}
+
+.ereader-mode.night .selected-text-preview {
+  background: #333;
+  color: #aaa;
+}
+
+.selection-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.highlight-btn,
+.comment-btn {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.highlight-btn:hover,
+.comment-btn:hover {
+  background: #f0f0f0;
+  border-color: #4a90e2;
+}
+
+.ereader-mode.night .highlight-btn,
+.ereader-mode.night .comment-btn {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.ereader-mode.night .highlight-btn:hover,
+.ereader-mode.night .comment-btn:hover {
+  background: #3a3a3a;
+  border-color: #4a90e2;
+}
+
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+.ereader-mode.night .color-picker {
+  border-top-color: #444;
+}
+
+.color-picker span {
+  font-size: 12px;
+  color: #666;
+  margin-right: 4px;
+}
+
+.ereader-mode.night .color-picker span {
+  color: #aaa;
+}
+
+.color-option {
+  width: 24px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  border-color: #333;
+}
+
+.color-option.active {
+  border-color: #333;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.5);
+}
+
+/* Text Highlight */
+.text-highlight {
+  border-radius: 2px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.text-highlight:hover {
+  opacity: 0.6;
+}
+
+/* PDFViewerDirect Styles - E-reader look */
+.pdf-viewer-direct {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  font-family: "Georgia", "Times New Roman", serif;
+  transition: background-color 0.3s ease;
+}
+
+.pdf-viewer-direct.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+}
+
+/* E-reader reading modes - Giống màn hình e-ink thật: nhẹ nhàng, không vàng cát, không hại mắt */
+.ereader-mode.day {
+  background: #fafafa;
+  /* Off-white nhẹ, không quá trắng - giống e-ink day mode */
+  color: #2c2c2c;
+}
+
+.ereader-mode.sepia {
+  background: #faf9f6;
+  /* Beige nhẹ, không vàng cát cháy - giống e-ink sepia mode */
+  color: #3a2e1f;
+}
+
+.ereader-mode.night {
+  background: #1a1a1a;
+  /* Đen nhẹ giống màn hình e-ink */
+  color: #e0e0e0;
+}
+
+/* Tối ưu cho mắt - Giống màn hình e-ink: contrast tự nhiên, không hại mắt */
+.ereader-mode.day .pdf-canvas-direct {
+  filter: contrast(1.1) brightness(0.98) !important;
+  /* Contrast tự nhiên như e-ink */
+  /* Tắt image smoothing để giữ độ nét giống e-ink */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.ereader-mode.sepia .pdf-canvas-direct {
+  filter: contrast(1.15) brightness(0.95) !important;
+  /* Nhẹ nhàng, không vàng cát */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.ereader-mode.night .pdf-canvas-direct {
+  filter: contrast(1.2) brightness(0.85) !important;
+  /* Contrast vừa phải cho night */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Viền bezel xung quanh màn hình e-ink - Giống máy đọc sách thật */
+.ereader-screen-frame {
+  background: #2a2a2a !important;
+  /* Màu xám nhẹ của bezel, không phải đen tuyền */
+  position: relative;
+  box-sizing: border-box;
+  /* Padding nhẹ để tạo viền bezel tự nhiên */
+  padding: 15px !important;
+  /* Đảm bảo stretch để chiếm đầy đủ chiều cao */
+  align-items: stretch !important;
+}
+
+@media (max-width: 768px) {
+  .ereader-screen-frame {
+    padding: 4px !important;
+    /* Giảm padding trên mobile để PDF chiếm nhiều không gian hơn */
+  }
+}
+
+.pdf-canvas-container-direct {
+  flex: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  /* Đảm bảo không có khoảng trống trên top */
+  overflow: auto !important;
+  position: relative !important;
+  /* Z-index sẽ được điều khiển bởi inline style trong JSX */
+  /* Đảm bảo canvas ở dưới controls */
+  padding-top: 0px !important;
+  /* KHÔNG có padding-top để PDF sát với top */
+  visibility: visible !important;
+  opacity: 1 !important;
+  box-sizing: border-box !important;
+  /* E-reader style: giảm padding để PDF nằm trong khung đen */
+  padding-left: 40px !important;
+  padding-right: 40px !important;
+  padding-top: 0px !important;
+  /* KHÔNG có padding-top để PDF sát với top */
+  padding-bottom: 60px !important;
+  margin-top: 0px !important;
+  /* KHÔNG có margin-top để PDF sát với top */
+  align-self: flex-start !important;
+  /* Đảm bảo container sát với top */
+  position: relative !important;
+  top: 0px !important;
+  /* Đảm bảo container sát với top của wrapper */
+  /* Đảm bảo canvas không bị che bởi controls */
+  isolation: isolate;
+}
+
+/* Wrapper chính - Background sẽ được set theo reading mode trong JSX */
+.pdf-content-wrapper {
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  padding-bottom: 0px !important;
+  z-index: 1;
+  position: relative;
+  /* Background sẽ được set theo reading mode trong JSX để khớp với PDF */
+  /* Đảm bảo không có khoảng trống thừa */
+  overflow: hidden;
+  /* Đảm bảo flex children sát với top */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  /* Stretch để children chiếm đầy đủ chiều rộng */
+  align-content: flex-start !important;
+  /* Căn trên để không có khoảng trống */
+}
+
+/* Đảm bảo không có CSS nào override padding-top của wrapper */
+.pdf-viewer-container.ereader-mode>.pdf-content-wrapper,
+.pdf-viewer-direct .pdf-content-wrapper {
+  /* KHÔNG set padding-top ở đây - sẽ được set trong JSX inline style */
+  /* Inline style có priority cao hơn CSS nên sẽ override */
+  /* Đảm bảo không có padding-top mặc định tạo khoảng trống */
+  padding-top: 0 !important;
+}
+
+/* Đảm bảo khi controls hiện, padding-top được set đúng trong inline style */
+.pdf-viewer-direct .pdf-content-wrapper[style*="padding-top"] {
+  /* Inline style sẽ override, nhưng đảm bảo không có CSS nào khác override */
+}
+
+@media (max-width: 1024px) {
+  .ereader-screen-frame {
+    padding: 8px !important;
+  }
+
+  .pdf-canvas-container-direct {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: 0px !important;
+    /* Không có padding-top để PDF sát với top */
+    padding-bottom: 70px !important;
+    align-items: flex-start !important;
+    /* Căn trên để PDF sát với top */
+    align-content: flex-start !important;
+    /* Đảm bảo không có khoảng trống trên top */
+    justify-content: center !important;
+    /* Căn giữa theo chiều ngang */
+  }
+}
+
+@media (max-width: 768px) {
+  .pdf-canvas-container-direct {
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    padding-top: 0px !important;
+    /* Không có padding-top để PDF sát với top */
+    padding-bottom: 30px !important;
+    /* Đảm bảo không có khoảng trống trên mobile */
+    align-items: flex-start !important;
+    min-height: calc(100vh - 120px) !important;
+  }
+
+  .pdf-canvas-direct {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+}
+
+.pdf-canvas-direct {
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 10 !important;
+  margin: 0 auto !important;
+  margin-top: 0 !important;
+  /* Không có margin-top để loại bỏ khoảng trống */
+  margin-bottom: 0 !important;
+  /* KHÔNG có margin-bottom để loại bỏ khoảng trống ở bottom */
+  flex-shrink: 0 !important;
+  /* Đảm bảo canvas sát với top của container */
+  align-self: flex-start !important;
+  /* Viền trang sách giống máy đọc sách thật - tối giản hơn */
+  border: none !important;
+  border-radius: 0 !important;
+  /* Shadow nhẹ để tạo độ sâu - giống trang sách trong máy đọc sách */
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  /* Contrast tự nhiên như e-ink - không quá mạnh để không hại mắt */
+  filter: contrast(1.1) brightness(0.98) !important;
+  /* Text rendering optimization - giống màn hình e-ink */
+  image-rendering: -webkit-optimize-contrast;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Đảm bảo canvas không bị co trên mobile */
+  object-fit: contain;
+  /* Giống máy đọc sách: thêm khoảng cách giữa các trang */
+  margin-bottom: 0px !important;
+  /* KHÔNG có margin-bottom để loại bỏ khoảng trống ở bottom */
+  /* Background sẽ được set trong JS để khớp với reading mode */
+  background: transparent !important;
+}
+
+@media (max-width: 768px) {
+  .pdf-canvas-direct {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    /* Căn giữa */
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* Đảm bảo canvas hiển thị đầy đủ chiều cao */
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+  }
+
+  .pdf-canvas-container-direct {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    padding-top: 0px !important;
+    /* Không có padding-top để PDF sát với top */
+    padding-bottom: 60px !important;
+    /* Đủ cho bottom controls */
+    margin-top: 0px !important;
+    /* Đảm bảo container chiếm đầy đủ chiều cao, không có khoảng trống */
+    min-height: calc(100vh - 84px) !important;
+    /* Trừ header (36px) + controls (48px) */
+    height: 100% !important;
+    align-items: flex-start !important;
+    /* Căn trên để PDF sát với top */
+    align-content: flex-start !important;
+    /* Đảm bảo không có khoảng trống trên top */
+    justify-content: center !important;
+    /* Căn giữa theo chiều ngang */
+    /* Loại bỏ khoảng trống */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Wrapper có padding-top cho mobile - sẽ được set trong JSX */
+  .pdf-content-wrapper {
+    margin-top: 0px !important;
+  }
+
+  /* Loại bỏ bezel frame trên mobile để PDF chiếm toàn bộ màn hình */
+  .ereader-screen-frame {
+    display: none !important;
+  }
+
+  /* Điều chỉnh padding container trên mobile - Loại bỏ padding-top không cần thiết */
+  .pdf-canvas-container-direct {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    padding-top: 0px !important;
+    /* Không có padding-top để PDF sát với top */
+    margin-top: 0px !important;
+    /* Đảm bảo không có margin-top */
+    align-self: flex-start !important;
+    /* Đảm bảo container sát với top */
+  }
+
+  /* Đảm bảo PDF viewer không có khoảng trống */
+  .pdf-viewer-direct {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    overflow: hidden;
+  }
+
+
+  /* REMOVED: This rule was causing top-controls to expand to 100% height on mobile
+     The first-of-type selector was matching the top-controls div and forcing it to be 100% height 
+  .pdf-viewer-direct > div:first-of-type {
+    height: 100% !important;
+    min-height: 100% !important;
+    flex: 1;
+  }
+  */
+}
+
+.ereader-mode.night .pdf-canvas-direct {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+/* Legacy controls - giữ lại để tương thích */
+.control-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.control-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-btn.bookmarked {
+  background: rgba(255, 215, 0, 0.3);
+}
+
+.control-select {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.page-info,
+.scale-info {
+  padding: 8px 12px;
+  font-size: 14px;
+  min-width: 100px;
+  text-align: center;
+}
+
+/* Annotation overlay */
+.annotation-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.text-highlight {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.text-highlight:hover {
+  opacity: 0.6 !important;
+}
+
+.annotation-marker {
+  position: absolute;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.annotation-icon {
+  font-size: 20px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  transition: transform 0.2s;
+}
+
+.annotation-marker:hover .annotation-icon {
+  transform: scale(1.2);
+}
+
+.annotation-popup {
+  position: absolute;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 200px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
+}
+
+.annotation-marker:hover .annotation-popup {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.annotation-text {
+  font-size: 13px;
+  color: #333;
+  margin-bottom: 4px;
+  word-wrap: break-word;
+}
+
+/* Text selection menu */
+.text-selection-menu {
+  position: fixed;
+  z-index: 1000;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+}
+
+.selection-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selection-menu-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.highlight-btn,
+.comment-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.highlight-btn:hover,
+.comment-btn:hover {
+  background: #f0f0f0;
+  border-color: #4a90e2;
+}
+
+.color-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.color-picker label {
+  font-size: 12px;
+  color: #666;
+}
+
+.color-picker input[type="color"] {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Sidebar improvements */
+.sidebar-toggle-collapsed {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  /* Đặt ở bottom để không che nội dung trên mobile */
+  top: auto;
+  /* Không ở giữa màn hình */
+  transform: none;
+  /* Bỏ translateY */
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Trên mobile, đặt button edit ở góc dưới phải, không che nội dung */
+@media (max-width: 768px) {
+  .sidebar-toggle-collapsed {
+    right: 15px;
+    bottom: 70px;
+    /* Đặt trên bottom controls */
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+}
+
+.sidebar-toggle-collapsed:hover {
+  background: rgba(74, 144, 226, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.control-btn.active {
+  background: rgba(74, 144, 226, 0.3);
+  border-color: #4a90e2;
+}
+
+.bookmarks-list,
+.annotations-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.bookmark-item,
+.annotation-item {
+  padding: 8px;
+  margin: 4px 0;
+  background: #f9f9f9;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bookmark-item:hover,
+.annotation-item:hover {
+  background: #f0f0f0;
+  transform: translateX(4px);
+}
+
+.annotation-item.active {
+  background: #e3f2fd;
+  border-left: 3px solid #4a90e2;
+}
+
+.annotation-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.annotation-page {
+  font-size: 12px;
+  color: #666;
+  font-weight: 600;
+}
+
+.highlight-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: white;
+  font-weight: 600;
+}
+
+.annotation-item-text {
+  font-size: 13px;
+  color: #333;
+  margin-top: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+/* Mobile optimizations - Loại bỏ khoảng trống */
+@media (max-width: 768px) {
+  .pdf-canvas-direct {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .pdf-canvas-container-direct {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0px !important;
+    /* Không có padding-top để PDF sát với top */
+    padding-bottom: 10px !important;
+    min-height: calc(100vh - 100px) !important;
+    height: 100% !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    /* Đảm bảo không có khoảng trống */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .pdf-viewer-direct {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    overflow: hidden;
+  }
+
+  /* REMOVED: This rule was causing top-controls to expand to 100% height on mobile
+  .pdf-viewer-direct>div:first-of-type {
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+  */
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pdf-content-wrapper {
+    flex-direction: column;
+    /* Padding-top sẽ được set trong JSX */
+  }
+
+  .pdf-content.ereader-content {
+    padding: 50px 10px 70px 10px;
+    /* Padding bottom đủ để button không bị che (60px button + 10px margin) */
+    margin-bottom: 0;
+    margin-top: 0;
+    overflow-x: hidden;
+    /* Ngăn scroll ngang */
+    width: 100%;
+    max-width: 100%;
+    align-items: center;
+    /* Center để PDF không bị co */
+    justify-content: center;
+    min-height: calc(100vh - 50px - 60px);
+    /* Trừ top controls và bottom controls */
+  }
+
+  /* Bottom controls - floating và nhỏ gọn hơn trên mobile */
+  .ereader-controls.bottom-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    max-height: 60px;
+    z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .ereader-controls.bottom-controls .controls-group {
+    gap: 8px;
+  }
+
+  .ereader-controls.bottom-controls .nav-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .ereader-controls.bottom-controls .zoom-controls {
+    font-size: 12px;
+  }
+
+  .ereader-controls.bottom-controls .zoom-controls .icon-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  /* Sidebar - ẩn mặc định trên mobile, chỉ hiện khi mở */
+  .annotations-sidebar {
+    width: 100%;
+    max-height: 50vh;
+    position: fixed;
+    bottom: 60px;
+    /* Đặt trên bottom controls */
+    right: 0;
+    border-left: none;
+    border-top: 1px solid #e0e0e0;
+    border-bottom: none;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 99;
+  }
+
+  .annotations-sidebar.collapsed {
+    transform: translateY(calc(100% - 50px));
+    /* Chỉ hiện header khi collapsed */
+    max-height: 50px;
+    overflow: hidden;
+  }
+
+  .annotations-sidebar.collapsed .sidebar-header {
+    border-bottom: none;
+  }
+
+  .annotations-sidebar.collapsed .annotations-list,
+  .annotations-sidebar.collapsed .bookmarks-list {
+    display: none;
+  }
+
+  /* Top controls - Relative để đẩy PDF xuống */
+  .ereader-controls.top-controls {
+    /* Relative để đẩy PDF xuống thay vì chồng lên */
+    position: relative !important;
+    /* Top, left, right, z-index, background sẽ được điều khiển bởi inline style trong JSX */
+    width: 100% !important;
+    /* QUAN TRỌNG: Height sẽ được điều khiển động trong JSX inline style */
+    /* Đảm bảo không có CSS nào override height thành 100% hoặc 100vh */
+    /* KHÔNG set height, max-height, min-height ở đây - để inline style điều khiển hoàn toàn */
+    /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    /* Bỏ viền bên trái và bên phải */
+    border-left: none !important;
+    border-right: none !important;
+    /* QUAN TRỌNG: Không cho phép wrap để tránh controls xuống dòng và che nội dung */
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    /* Nếu màn hình quá nhỏ, ẩn một số controls thay vì wrap */
+    /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+  }
+
+  .ereader-controls.top-controls .page-info {
+    font-size: 12px;
+  }
+
+  .ereader-controls.top-controls {
+    flex-wrap: nowrap !important;
+    /* Không wrap để tránh che nội dung */
+  }
+
+  .controls-left {
+    flex: 0 0 auto;
+    /* Không shrink */
+    min-width: 0;
+    white-space: nowrap !important;
+    /* Không wrap text */
+  }
+
+  .controls-right {
+    flex: 0 0 auto;
+    /* Không shrink */
+    justify-content: flex-end;
+    gap: 4px;
+    /* Giảm gap trên mobile */
+    min-width: 0;
+    flex-wrap: nowrap !important;
+    /* Đảm bảo không wrap */
+    align-items: center;
+    white-space: nowrap !important;
+    /* Không wrap text */
+  }
+
+  /* Đảm bảo progress-info và reading-mode-selector luôn cùng hàng */
+  .controls-right .progress-info {
+    font-size: 11px;
+    white-space: nowrap;
+    padding: 0 2px;
+  }
+
+  .controls-left .page-info {
+    margin-right: 4px;
+    /* Khoảng cách trên mobile */
+    font-size: 11px;
+  }
+
+  .controls-right .reading-mode-selector {
+    display: inline-flex;
+    gap: 1px;
+    /* Giảm gap giữa các button trên mobile */
+    padding: 1px;
+  }
+
+  .controls-right .reading-mode-selector button {
+    padding: 3px 5px;
+    /* Giảm padding button trên mobile */
+    font-size: 14px;
+    min-width: 28px;
+    height: 24px;
+  }
+
+  .controls-right .bookmark-btn,
+  .controls-right .icon-btn {
+    padding: 4px 6px;
+    font-size: 14px;
+    min-width: 28px;
+    height: 24px;
+  }
+
+  .controls-center {
+    order: 3;
+    width: 100%;
+    margin: 4px 0 0 0;
+    /* QUAN TRỌNG: Giới hạn chiều cao cứng trên mobile */
+    height: auto !important;
+    max-height: 40px !important;
+    /* Không được cao quá 40px */
+    min-height: 0 !important;
+    /* Overflow sẽ được điều khiển bởi inline style trong JSX */
+    flex-shrink: 1;
+  }
+
+  .controls-center .progress-bar {
+    height: 3px;
+  }
+
+  .click-hints {
+    display: none;
+  }
+
+  /* PDF document wrapper - điều chỉnh cho mobile */
+  .pdf-document-wrapper {
+    padding: 5px;
+    max-width: 100%;
+    /* Không force width để PDF tự nhiên */
+    box-sizing: border-box;
+    margin: 0 auto;
+    display: inline-block;
+    /* Để PDF tự điều chỉnh kích thước */
+  }
+
+  .pdf-page.ereader-page {
+    max-width: 100%;
+    /* Chỉ giới hạn max, không force width */
+    /* Không force width để giữ tỷ lệ tự nhiên của PDF */
+  }
+
+  /* Đảm bảo canvas và text layer cũng fit */
+  .pdf-page.ereader-page canvas,
+  .pdf-page.ereader-page .react-pdf__Page__canvas {
+    max-width: 100%;
+    /* Chỉ giới hạn max, không force width */
+    /* Không force width để giữ tỷ lệ tự nhiên */
+  }
+
+  .react-pdf__Page__textContent {
+    max-width: 100%;
+    /* Chỉ giới hạn max */
+  }
+
+  /* Đảm bảo page container không bị co */
+  .page-container {
+    max-width: 100%;
+    overflow: hidden;
+    display: inline-block;
+    /* Để PDF tự điều chỉnh */
+    /* Không force width để giữ tỷ lệ */
+  }
+
+  /* Đảm bảo PDF scale phù hợp với màn hình */
+  .pdf-content.ereader-content {
+    align-items: center;
+    /* Center để PDF không bị co */
+    padding-top: 10px;
+    justify-content: center;
+    /* Center để PDF hiển thị đúng */
+  }
+
+  /* Đảm bảo PDF hiển thị đầy đủ chiều cao */
+  .pdf-document-wrapper {
+    display: inline-block;
+    /* Để PDF tự điều chỉnh */
+    /* Không force width */
+  }
+
+  .page-container {
+    display: inline-block;
+    /* Để PDF tự điều chỉnh */
+    /* Không force width */
+  }
+
+  /* Text selection menu - điều chỉnh cho mobile */
+  .text-selection-menu {
+    max-width: 90vw;
+  }
+
+  .selection-menu-content {
+    min-width: auto;
+    padding: 10px;
+  }
+
+  .selection-menu-actions {
+    gap: 6px;
+  }
+
+  .highlight-btn,
+  .comment-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+}
+
+/* Mobile portrait - màn hình dọc */
+@media (max-width: 768px) and (orientation: portrait) {
+  .pdf-content-wrapper {
+    /* KHÔNG set padding-top ở đây - sẽ được set trong JSX inline style */
+    /* Đảm bảo không có padding-top mặc định tạo khoảng trống */
+    padding-top: 0 !important;
+    overflow-x: hidden;
+    /* Ngăn scroll ngang */
+    width: 100%;
+  }
+
+  .pdf-content.ereader-content {
+    padding: 60px 5px 100px 5px;
+    /* Tăng padding top để không bị che */
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .ereader-controls.bottom-controls {
+    max-height: 55px;
+  }
+
+  .annotations-sidebar {
+    bottom: 55px;
+    max-height: 45vh;
+  }
+}
+
+/* Mobile landscape - màn hình ngang */
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 600px) {
+  .pdf-content-wrapper {
+    padding-top: 45px;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  .pdf-content.ereader-content {
+    padding: 55px 10px 80px 10px;
+    /* Tăng padding top để không bị che */
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .ereader-controls.top-controls {
+    /* Height sẽ được điều khiển động trong JSX inline style */
+    position: relative !important;
+    width: 100% !important;
+  }
+
+  .ereader-controls.bottom-controls {
+    max-height: 50px;
+  }
+
+  .annotations-sidebar {
+    bottom: 50px;
+    max-height: 40vh;
+  }
+}
+
+/* Text Reflow Mode Styles */
+.text-reflow-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: constant;
+  min-height: 100%;
+}
+
+.text-reflow-container p {
+  margin-bottom: 1.5em;
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+/* Font controls integration */
+.font-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.font-controls .icon-btn {
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

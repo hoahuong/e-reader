@@ -1,0 +1,32 @@
+{
+  "name": "pdf-reader-app",
+  "private": true,
+  "version": "1.0.0",
+  "author": "bà già (baza)",
+  "description": "Ứng dụng đọc PDF với chức năng ghi chú và lật trang",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mobile": "vite --host",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^5.4.530",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-pdf": "^10.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "vite": "^7.2.4"
+  }
+}

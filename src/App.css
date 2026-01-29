@@ -1,0 +1,322 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  position: relative;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-input-label {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-block;
+}
+
+.file-input-label:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.file-input-label.large {
+  padding: 16px 32px;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  margin-top: 24px;
+}
+
+.file-input-label.large:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.export-btn {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.file-info {
+  margin-top: 8px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: calc(100vh - 0px);
+  /* Sẽ được điều chỉnh khi có minimal header */
+}
+
+/* Header minimal giờ là relative nên không cần trừ height */
+/* PDF sẽ tự động được đẩy xuống khi header hiện */
+.app-main:has(.app-header-minimal) {
+  height: 100vh;
+  /* Không trừ vì header là relative và đẩy PDF xuống */
+}
+
+@media (max-width: 768px) {
+  .app-main:has(.app-header-minimal) {
+    height: 100vh;
+    /* Không trừ vì header là relative và đẩy PDF xuống */
+  }
+}
+
+/* Minimal header khi đã mở PDF - Relative để đẩy PDF xuống thay vì che phủ */
+.app-header-minimal {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  position: relative;
+  /* Relative để đẩy PDF xuống */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  /* Khi visible: có height bình thường, khi hidden: height = 0 để đẩy PDF lên */
+  min-height: 40px;
+  transition: height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+}
+
+.app-header-minimal.visible {
+  opacity: 1;
+  height: auto;
+  min-height: 40px;
+  padding: 8px 16px;
+}
+
+.app-header-minimal.hidden {
+  opacity: 0;
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.back-btn {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.file-name-minimal {
+  flex: 1;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.header-actions-minimal {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.export-btn-small,
+.file-input-label-small {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: white;
+  transition: all 0.2s;
+  display: inline-block;
+}
+
+.export-btn-small:hover,
+.file-input-label-small:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsive cho minimal header */
+@media (max-width: 768px) {
+  .app-header-minimal {
+    padding: 6px 12px;
+    min-height: 36px;
+  }
+
+  .back-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .file-name-minimal {
+    font-size: 12px;
+  }
+
+  .export-btn-small,
+  .file-input-label-small {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
+
+.welcome-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 40px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-content {
+  text-align: center;
+  max-width: 600px;
+  background: white;
+  padding: 48px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-content h2 {
+  color: #667eea;
+  margin-bottom: 16px;
+  font-size: 32px;
+}
+
+.welcome-content>p {
+  color: #666;
+  font-size: 18px;
+  margin-bottom: 32px;
+}
+
+.features {
+  margin-top: 40px;
+  text-align: left;
+}
+
+.features h3 {
+  color: #333;
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+
+.features ul {
+  list-style: none;
+  padding: 0;
+}
+
+.features li {
+  padding: 8px 0;
+  color: #555;
+  font-size: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.features li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-header h1 {
+    font-size: 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .welcome-screen {
+    padding: 20px 16px;
+    padding-top: 80px;
+    /* Đảm bảo không bị che bởi header */
+  }
+
+  .welcome-content {
+    padding: 32px 24px;
+    max-width: 100%;
+  }
+
+  .welcome-content h2 {
+    font-size: 24px;
+  }
+
+  .file-input-label.large {
+    padding: 14px 28px;
+    font-size: 16px;
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+}
