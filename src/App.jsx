@@ -7,7 +7,7 @@ import CatalogSelector from './components/CatalogSelector';
 import LanguageSelector from './components/LanguageSelector';
 import { savePdf, listPdfs, getPdfData, deletePdf } from './pdfStorage';
 import { suggestCatalog } from './catalogManager';
-import { loadMetadataFromCloud, syncMetadataToLocal } from './metadataSync';
+import { loadMetadataFromCloud, syncMetadataToLocal } from './metadataSyncConfig';
 import { t, getCurrentLanguage, setCurrentLanguage } from './i18n/locales';
 import './App.css';
 

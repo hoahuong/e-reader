@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { listPdfs, deletePdf, getPdfData } from '../pdfStorage';
 import { getAllCatalogs, createCatalog, updateCatalog, deleteCatalog, updateCatalogOrder } from '../catalogManager';
 import { openDB } from '../pdfStorage';
-import { loadMetadataFromCloud, syncMetadataToLocal, saveMetadataToCloud } from '../metadataSync';
+import { loadMetadataFromCloud, syncMetadataToLocal, saveMetadataToCloud } from '../metadataSyncConfig';
 import { t, getCurrentLanguage } from '../i18n/locales';
 import './FileManager.css';
 
