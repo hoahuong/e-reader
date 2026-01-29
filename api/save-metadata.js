@@ -7,7 +7,7 @@ import { put } from '@vercel/blob';
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 10,
+  maxDuration: 60, // Tăng timeout lên 60s (max cho Hobby plan)
 };
 
 export default async function handler(request) {
@@ -47,22 +47,34 @@ export default async function handler(request) {
 
     console.log(`[API save-metadata] Đang upload lên blob storage... (size: ${blob.size} bytes)`);
 
-    // Upload lên Vercel Blob Storage
-    const result = await put('metadata/metadata.json', blob, {
-      access: 'public',
-      contentType: 'application/json',
-    });
+    // Upload lên Vercel Blob Storage với timeout
+    const uploadController = new AbortController();
+    const uploadTimeoutId = setTimeout(() => uploadController.abort(), 50000); // 50s timeout
+    
+    try {
+      const result = await put('metadata/metadata.json', blob, {
+        access: 'public',
+        contentType: 'application/json',
+      });
+      clearTimeout(uploadTimeoutId);
+      
+      console.log(`[API save-metadata] Upload thành công tại: ${result.url}`);
 
-    console.log(`[API save-metadata] Upload thành công tại: ${result.url}`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        url: result.url,
-        lastSync: metadata.lastSync,
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+      return new Response(
+        JSON.stringify({
+          success: true,
+          url: result.url,
+          lastSync: metadata.lastSync,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    } catch (uploadError) {
+      clearTimeout(uploadTimeoutId);
+      if (uploadError.name === 'AbortError' || uploadError.message.includes('timeout')) {
+        throw new Error('Timeout khi upload metadata lên blob storage');
+      }
+      throw uploadError;
+    }
   } catch (error) {
     console.error('[API save-metadata] Lỗi khi lưu metadata:', error);
     console.error('[API save-metadata] Chi tiết:', error.message, error.stack);
