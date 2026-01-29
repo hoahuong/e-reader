@@ -449,8 +449,9 @@ function FileManager({ onFileSelect }) {
                     }}
                     className="file-delete-btn"
                     title={t('fileManager.delete')}
+                    aria-label={t('fileManager.delete')}
                   >
-                    ✕
+                    🗑️
                   </button>
                 </div>
               ))}
@@ -502,8 +503,9 @@ function FileManager({ onFileSelect }) {
                   }}
                   className="file-delete-btn"
                   title={t('fileManager.delete')}
+                  aria-label={t('fileManager.delete')}
                 >
-                  ✕
+                  🗑️
                 </button>
               </div>
             ))}

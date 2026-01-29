@@ -231,9 +231,15 @@
   color: #999;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 14px;
-  opacity: 0;
+  font-size: 16px;
+  opacity: 0.6;
   transition: all 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
 }
 
 .file-item-draggable:hover .file-delete-btn {
@@ -243,6 +249,25 @@
 .file-delete-btn:hover {
   background: #fee;
   color: #c33;
+  opacity: 1;
+}
+
+.file-delete-btn:active {
+  transform: scale(0.95);
+}
+
+/* Mobile: Luôn hiển thị button delete */
+@media (max-width: 768px) {
+  .file-delete-btn {
+    opacity: 1;
+    color: #c33;
+    font-size: 18px;
+    padding: 6px 10px;
+  }
+  
+  .file-item-draggable:hover .file-delete-btn {
+    opacity: 1;
+  }
 }
 
 .catalog-empty {
