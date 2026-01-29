@@ -14,7 +14,7 @@ export async function syncMetadataToCloud() {
   try {
     const { getAllCatalogs } = await import('./catalogManager');
     const { listPdfs } = await import('./pdfStorage');
-    const { saveMetadataToCloud } = await import('./metadataSync');
+    const { saveMetadataToCloud } = await import('./metadataSyncConfig');
     
     const [catalogs, files] = await Promise.all([
       getAllCatalogs(),
