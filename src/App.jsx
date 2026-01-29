@@ -43,19 +43,28 @@ function App() {
       // Sync metadata từ cloud sau (background, không block UI)
       setTimeout(async () => {
         try {
+          console.log('[App] Bắt đầu sync metadata từ cloud...');
           const cloudMetadata = await loadMetadataFromCloud();
-          if (cloudMetadata) {
+          if (cloudMetadata && (cloudMetadata.catalogs?.length > 0 || cloudMetadata.files?.length > 0)) {
+            console.log(`[App] Tìm thấy metadata trên cloud: ${cloudMetadata.catalogs?.length || 0} catalogs, ${cloudMetadata.files?.length || 0} files`);
             await syncMetadataToLocal(cloudMetadata);
             // Reload sau khi sync
             const updatedList = await listPdfs();
-            setUploadedList(updatedList);
-            console.log('Metadata đã được sync từ cloud vào App');
+            if (updatedList.length !== list.length) {
+              setUploadedList(updatedList);
+              console.log(`[App] ✅ Metadata đã được sync từ cloud: ${updatedList.length} files`);
+            } else {
+              console.log('[App] Không có thay đổi sau sync');
+            }
+          } else {
+            console.log('[App] Không có metadata trên cloud hoặc metadata rỗng');
           }
         } catch (syncError) {
-          console.warn('Không thể sync metadata từ cloud:', syncError.message);
+          console.error('[App] Lỗi khi sync metadata từ cloud:', syncError);
+          console.error('[App] Chi tiết:', syncError.message, syncError.stack);
           // Không hiển thị error để không làm phiền user
         }
-      }, 100);
+      }, 500); // Tăng delay lên 500ms để đảm bảo UI đã render xong
     } catch (e) {
       console.error('Lỗi khi tải danh sách PDF:', e);
     } finally {

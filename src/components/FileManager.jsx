@@ -58,25 +58,50 @@ function FileManager({ onFileSelect }) {
         try {
           console.log('[FileManager] Bắt đầu load metadata từ cloud (background)...');
           const cloudMetadata = await loadMetadataFromCloud();
-          if (cloudMetadata && (cloudMetadata.catalogs?.length > 0 || cloudMetadata.files?.length > 0)) {
-            console.log('[FileManager] Tìm thấy metadata trên cloud, đang sync...');
-            await syncMetadataToLocal(cloudMetadata);
-            // Reload sau khi sync
-            const [updatedFiles, updatedCatalogs] = await Promise.all([
-              listPdfs(),
-              getAllCatalogs(),
-            ]);
-            setFiles(updatedFiles);
-            setCatalogs(updatedCatalogs);
-            console.log('[FileManager] Metadata đã được sync từ cloud thành công');
+          
+          if (cloudMetadata) {
+            // Kiểm tra xem có data mới không
+            const hasNewCatalogs = cloudMetadata.catalogs?.length > catalogsList.length;
+            const hasNewFiles = cloudMetadata.files?.length > filesList.length;
+            const hasDifferentData = hasNewCatalogs || hasNewFiles || 
+              (cloudMetadata.catalogs?.length > 0 && catalogsList.length === 0) ||
+              (cloudMetadata.files?.length > 0 && filesList.length === 0);
+            
+            if (hasDifferentData || cloudMetadata.catalogs?.length > 0 || cloudMetadata.files?.length > 0) {
+              console.log('[FileManager] Tìm thấy metadata trên cloud, đang sync...');
+              console.log(`[FileManager] Cloud: ${cloudMetadata.catalogs?.length || 0} catalogs, ${cloudMetadata.files?.length || 0} files`);
+              console.log(`[FileManager] Local: ${catalogsList.length} catalogs, ${filesList.length} files`);
+              
+              await syncMetadataToLocal(cloudMetadata);
+              
+              // Reload sau khi sync
+              const [updatedFiles, updatedCatalogs] = await Promise.all([
+                listPdfs(),
+                getAllCatalogs(),
+              ]);
+              
+              console.log(`[FileManager] Sau sync: ${updatedCatalogs.length} catalogs, ${updatedFiles.length} files`);
+              
+              // Chỉ update nếu có thay đổi
+              if (updatedCatalogs.length !== catalogsList.length || updatedFiles.length !== filesList.length) {
+                setFiles(updatedFiles);
+                setCatalogs(updatedCatalogs);
+                console.log('[FileManager] ✅ Metadata đã được sync từ cloud thành công');
+              } else {
+                console.log('[FileManager] Không có thay đổi sau sync');
+              }
+            } else {
+              console.log('[FileManager] Không có metadata mới trên cloud hoặc metadata rỗng');
+            }
           } else {
-            console.log('[FileManager] Không có metadata trên cloud hoặc metadata rỗng');
+            console.log('[FileManager] Không thể load metadata từ cloud (có thể chưa có data hoặc lỗi)');
           }
         } catch (syncError) {
           console.error('[FileManager] Lỗi khi sync metadata từ cloud:', syncError);
-          // Không hiển thị error để không làm phiền user
+          console.error('[FileManager] Chi tiết lỗi:', syncError.message, syncError.stack);
+          // Không hiển thị error để không làm phiền user, nhưng log để debug
         }
-      }, 100);
+      }, 500); // Tăng delay lên 500ms để đảm bảo UI đã render xong
     } catch (error) {
       console.error('[FileManager] Error loading data:', error);
       console.error('[FileManager] Chi tiết:', error.message, error.stack);

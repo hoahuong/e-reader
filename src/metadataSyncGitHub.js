@@ -4,42 +4,89 @@
  */
 
 /**
- * Lấy metadata từ GitHub
+ * Lấy metadata từ GitHub với retry logic
  */
 export async function loadMetadataFromCloud() {
-  try {
-    console.log('[Metadata Sync GitHub] Đang load metadata từ GitHub...');
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout (trước server timeout 60s)
-    
+  const maxRetries = 3;
+  const baseTimeout = 20000; // 20s timeout cho mỗi lần thử
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch('/api/github-metadata', {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`[Metadata Sync GitHub] API trả về lỗi ${response.status}:`, errorText);
-        return null;
+      if (attempt > 0) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+        console.log(`[Metadata Sync GitHub] Retry ${attempt}/${maxRetries} sau ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
-      const metadata = await response.json();
-      console.log(`[Metadata Sync GitHub] Load thành công: ${metadata.catalogs?.length || 0} catalogs, ${metadata.files?.length || 0} files`);
-      return metadata;
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        console.warn('[Metadata Sync GitHub] Request timeout sau 45s, dùng local data');
+      console.log(`[Metadata Sync GitHub] Đang load metadata từ GitHub... (lần thử ${attempt + 1}/${maxRetries})`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), baseTimeout);
+      
+      try {
+        const response = await fetch('/api/github-metadata', {
+          signal: controller.signal,
+          cache: 'no-cache', // Đảm bảo không dùng cache cũ
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`[Metadata Sync GitHub] API trả về lỗi ${response.status}:`, errorText);
+          
+          // Nếu là lỗi 404 (file chưa tồn tại), trả về null ngay
+          if (response.status === 404) {
+            console.log('[Metadata Sync GitHub] File metadata chưa tồn tại trên GitHub');
+            return null;
+          }
+          
+          // Nếu không phải lần thử cuối, tiếp tục retry
+          if (attempt < maxRetries - 1) {
+            continue;
+          }
+          return null;
+        }
+        
+        const metadata = await response.json();
+        
+        // Kiểm tra xem metadata có hợp lệ không
+        if (!metadata || (Array.isArray(metadata.catalogs) && Array.isArray(metadata.files))) {
+          console.log(`[Metadata Sync GitHub] Load thành công: ${metadata.catalogs?.length || 0} catalogs, ${metadata.files?.length || 0} files`);
+          return metadata;
+        } else {
+          console.warn('[Metadata Sync GitHub] Metadata không hợp lệ:', metadata);
+          if (attempt < maxRetries - 1) {
+            continue;
+          }
+          return null;
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.warn(`[Metadata Sync GitHub] Request timeout sau ${baseTimeout}ms (lần thử ${attempt + 1})`);
+          if (attempt < maxRetries - 1) {
+            continue;
+          }
+          return null;
+        }
+        // Nếu không phải timeout và không phải lần thử cuối, tiếp tục retry
+        if (attempt < maxRetries - 1) {
+          console.warn(`[Metadata Sync GitHub] Lỗi fetch: ${fetchError.message}, sẽ retry...`);
+          continue;
+        }
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error(`[Metadata Sync GitHub] Lỗi khi load metadata (lần thử ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) {
+        console.error('[Metadata Sync GitHub] Đã hết số lần thử, trả về null');
         return null;
       }
-      throw fetchError;
     }
-  } catch (error) {
-    console.error('[Metadata Sync GitHub] Lỗi khi load metadata:', error);
-    return null;
   }
+  
+  return null;
 }
 
 /**
