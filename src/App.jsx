@@ -36,20 +36,26 @@ function App() {
     try {
       setListLoading(true);
       
-      // Sync metadata từ cloud trước khi load local
-      try {
-        const cloudMetadata = await loadMetadataFromCloud();
-        if (cloudMetadata) {
-          await syncMetadataToLocal(cloudMetadata);
-          console.log('Metadata đã được sync từ cloud vào App');
-        }
-      } catch (syncError) {
-        console.warn('Không thể sync metadata từ cloud:', syncError.message);
-        // Tiếp tục với local data nếu sync fail
-      }
-      
+      // Load từ local trước (hiển thị ngay)
       const list = await listPdfs();
       setUploadedList(list);
+      
+      // Sync metadata từ cloud sau (background, không block UI)
+      setTimeout(async () => {
+        try {
+          const cloudMetadata = await loadMetadataFromCloud();
+          if (cloudMetadata) {
+            await syncMetadataToLocal(cloudMetadata);
+            // Reload sau khi sync
+            const updatedList = await listPdfs();
+            setUploadedList(updatedList);
+            console.log('Metadata đã được sync từ cloud vào App');
+          }
+        } catch (syncError) {
+          console.warn('Không thể sync metadata từ cloud:', syncError.message);
+          // Không hiển thị error để không làm phiền user
+        }
+      }, 100);
     } catch (e) {
       console.error('Lỗi khi tải danh sách PDF:', e);
     } finally {

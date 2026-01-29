@@ -10,9 +10,9 @@ export async function loadMetadataFromCloud() {
   try {
     console.log('[Metadata Sync] Đang load metadata từ cloud...');
     
-    // Thêm timeout cho fetch request (45s để tránh 504)
+    // Giảm timeout xuống 10s để phản hồi nhanh hơn
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
       const response = await fetch('/api/get-metadata', {
@@ -40,7 +40,7 @@ export async function loadMetadataFromCloud() {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn('[Metadata Sync] Request timeout sau 45s, dùng local data');
+        console.warn('[Metadata Sync] Request timeout sau 10s, dùng local data');
         return null;
       }
       throw fetchError;
