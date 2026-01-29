@@ -54,18 +54,24 @@
 }
 
 .file-input-label.large {
-  padding: 16px 32px;
-  font-size: 18px;
-  background: rgba(255, 255, 255, 0.25);
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  margin-top: 24px;
+  padding: 14px 28px;
+  font-size: 16px;
+  background: #f8f9fa;
+  border: 2px dashed #dee2e6;
+  border-radius: 8px;
+  margin-top: 0;
+  margin-bottom: 0;
+  color: #495057;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .file-input-label.large:hover {
-  background: rgba(255, 255, 255, 0.35);
-  border-color: rgba(255, 255, 255, 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: #e9ecef;
+  border-color: #667eea;
+  border-style: solid;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
 .export-btn {
@@ -240,23 +246,421 @@
 
 .welcome-content {
   text-align: center;
-  max-width: 600px;
+  max-width: 900px;
+  width: 100%;
   background: white;
-  padding: 48px;
+  padding: 48px 40px;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  max-height: calc(100vh - 80px);
+  margin: 0 auto;
+}
+
+.welcome-content-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 30px;
+  text-align: left;
+}
+
+.section-panel {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #e0e0e0;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-panel.full-drive-viewer {
+  padding: 0;
+  border-radius: 0;
+  background: white;
+  min-height: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.section-title {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #667eea;
+}
+
+.section-header-with-filter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.section-header-with-filter .section-title {
+  margin: 0;
+  flex: 1;
+}
+
+.catalog-filter {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.catalog-filter:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.uploaded-list-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.catalog-group {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.catalog-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.catalog-group-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.catalog-group-count {
+  font-size: 12px;
+  color: #888;
+  background: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.google-drive-section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+}
+
+.uploaded-pdfs-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%);
+}
+
+@media (max-width: 1024px) {
+  .welcome-content-main {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-panel {
+    min-height: 300px;
+  }
+}
+
+/* Upload Modal */
+.upload-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.upload-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.upload-modal h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.upload-modal-content {
+  margin-bottom: 20px;
+}
+
+.upload-modal-content p {
+  margin: 0 0 16px 0;
+  color: #666;
+}
+
+.upload-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-upload-btn,
+.cancel-upload-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-upload-btn {
+  background: #4285f4;
+  color: white;
+}
+
+.confirm-upload-btn:hover {
+  background: #357ae8;
+}
+
+.cancel-upload-btn {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.cancel-upload-btn:hover {
+  background: #e0e0e0;
+}
+
+/* View Navigation */
+.main-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px 0 32px 0;
+  width: 100%;
+  align-items: stretch;
+}
+
+.view-nav-btn {
+  padding: 18px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+  text-align: left;
+}
+
+.view-nav-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.view-nav-btn.manage-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+}
+
+.view-nav-btn.manage-btn:hover {
+  box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+}
+
+.btn-description {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.view-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.back-to-home-btn {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.2s;
+}
+
+.back-to-home-btn:hover {
+  background: #e8e8e8;
+  border-color: #bbb;
+}
+
+.view-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.drive-view-container,
+.manage-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.drive-view-container > div:last-child,
+.manage-view-container > div:last-child {
+  flex: 1;
+  overflow: hidden;
 }
 
 .welcome-content h2 {
-  color: #667eea;
-  margin-bottom: 16px;
-  font-size: 32px;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-size: 28px;
+  font-weight: 700;
 }
 
-.welcome-content>p {
+.welcome-content > p {
+  margin: 0 0 32px 0;
+  font-size: 15px;
   color: #666;
+  line-height: 1.6;
   font-size: 18px;
   margin-bottom: 32px;
+}
+
+/* Danh sách PDF đã upload */
+.uploaded-list-section {
+  margin-top: 0;
+  text-align: left;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.uploaded-list-section h3 {
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.uploaded-list-hint {
+  color: #888;
+  font-size: 14px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.uploaded-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  flex: 1;
+}
+
+.uploaded-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border-bottom: 1px solid #eee;
+}
+
+.uploaded-list-item:last-child {
+  border-bottom: none;
+}
+
+.uploaded-list-btn {
+  flex: 1;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 14px;
+  color: #333;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploaded-list-btn:hover {
+  background: rgba(102, 126, 234, 0.12);
+  color: #667eea;
+}
+
+.uploaded-list-remove {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #999;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+
+.uploaded-list-remove:hover {
+  color: #c62828;
+  background: rgba(198, 40, 40, 0.08);
 }
 
 .features {
@@ -318,5 +722,23 @@
     display: block;
     width: 100%;
     text-align: center;
+  }
+
+  .uploaded-list-section {
+    margin-top: 24px;
+    max-width: 100%;
+  }
+
+  .uploaded-list-section h3 {
+    font-size: 16px;
+  }
+
+  .uploaded-list {
+    max-height: 200px;
+  }
+
+  .uploaded-list-btn {
+    font-size: 13px;
+    padding: 10px 12px;
   }
 }

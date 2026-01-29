@@ -1,0 +1,337 @@
+.file-manager {
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  background: #f8f9fa;
+  overflow-y: auto;
+}
+
+.file-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.file-manager-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.create-catalog-btn-header {
+  padding: 10px 20px;
+  background: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-catalog-btn-header:hover {
+  background: #357ae8;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.catalogs-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.catalog-box {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 2px dashed #e0e0e0;
+  min-height: 200px;
+  transition: all 0.2s;
+  cursor: grab;
+  position: relative;
+}
+
+.catalog-box:active {
+  cursor: grabbing;
+}
+
+.catalog-box:hover {
+  border-color: #4285f4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.catalog-box.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.catalog-box.drag-over {
+  border-color: #4285f4;
+  background: #e8f0fe;
+  border-style: solid;
+}
+
+.catalog-box.drag-over-position {
+  border-top: 3px solid #4285f4;
+  border-top-style: solid;
+  margin-top: 8px;
+  padding-top: 20px;
+}
+
+.catalog-box.drag-over-position::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #4285f4;
+  border-radius: 8px 8px 0 0;
+}
+
+.catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.catalog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.catalog-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.edit-catalog-btn,
+.delete-catalog-btn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.edit-catalog-btn:hover {
+  background: #e8f0fe;
+}
+
+.delete-catalog-btn:hover {
+  background: #fee;
+}
+
+.catalog-edit-form {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  align-items: center;
+}
+
+.catalog-edit-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #4285f4;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.catalog-edit-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.save-catalog-btn,
+.cancel-edit-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.save-catalog-btn {
+  background: #34a853;
+  color: white;
+}
+
+.save-catalog-btn:hover {
+  background: #2d8f47;
+}
+
+.cancel-edit-btn {
+  background: #ea4335;
+  color: white;
+}
+
+.cancel-edit-btn:hover {
+  background: #d33b2c;
+}
+
+.catalog-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100px;
+}
+
+.file-item-draggable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: move;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.file-item-draggable:hover {
+  background: #e8f0fe;
+  border-color: #4285f4;
+  transform: translateX(4px);
+}
+
+.file-item-draggable.dragging {
+  opacity: 0.5;
+}
+
+.file-icon {
+  font-size: 20px;
+}
+
+.file-name-drag {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-delete-btn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.file-item-draggable:hover .file-delete-btn {
+  opacity: 1;
+}
+
+.file-delete-btn:hover {
+  background: #fee;
+  color: #c33;
+}
+
+.catalog-empty {
+  padding: 24px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  border: 2px dashed #e0e0e0;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.catalog-box.uncategorized {
+  border-color: #ccc;
+}
+
+.file-manager-loading {
+  padding: 48px;
+  text-align: center;
+  color: #666;
+}
+
+.file-manager-error {
+  padding: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.error-message {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 600px;
+  text-align: center;
+}
+
+.error-message h3 {
+  margin: 0 0 12px 0;
+  color: #856404;
+}
+
+.error-message p {
+  margin: 0 0 16px 0;
+  color: #856404;
+  line-height: 1.6;
+}
+
+.retry-btn {
+  padding: 10px 20px;
+  background: #ffc107;
+  color: #856404;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  background: #ffb300;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Drag and drop visual feedback */
+.catalog-box.drag-over {
+  border-color: #4285f4;
+  background: #e8f0fe;
+  border-style: solid;
+  border-width: 2px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .catalogs-container {
+    grid-template-columns: 1fr;
+  }
+
+  .file-manager-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .create-catalog-btn-header {
+    width: 100%;
+  }
+}

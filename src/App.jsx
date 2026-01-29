@@ -1,5 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import PDFViewerDirect from './components/PDFViewerDirect';
+import GoogleDriveViewer from './components/GoogleDriveViewer';
+import FileManager from './components/FileManager';
+import CatalogSelector from './components/CatalogSelector';
+import LanguageSelector from './components/LanguageSelector';
+import { savePdf, listPdfs, getPdfData, deletePdf } from './pdfStorage';
+import { suggestCatalog } from './catalogManager';
+import { t, getCurrentLanguage, setCurrentLanguage } from './i18n/locales';
 import './App.css';
 
 function App() {
@@ -7,7 +15,35 @@ function App() {
   const [annotations, setAnnotations] = useState([]);
   const [fileName, setFileName] = useState('');
   const [showHeader, setShowHeader] = useState(true);
+  const [uploadedList, setUploadedList] = useState([]); // [{ id, name, catalog }]
+  const [listLoading, setListLoading] = useState(true);
+  const [currentPdfId, setCurrentPdfId] = useState(null); // id trong DB khi đang đọc từ danh sách
+  const [selectedCatalog, setSelectedCatalog] = useState(null); // Catalog được chọn để filter
+  const [uploadCatalog, setUploadCatalog] = useState(null); // Catalog khi upload
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const headerTimeoutRef = useRef(null);
+  const fileUrlRef = useRef(null); // để revoke object URL khi đổi file
+
+
+  // Load danh sách PDF đã upload từ IndexedDB
+  const refreshUploadedList = useCallback(async () => {
+    try {
+      setListLoading(true);
+      const list = await listPdfs();
+      setUploadedList(list);
+    } catch (e) {
+      console.error('Lỗi khi tải danh sách PDF:', e);
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUploadedList();
+  }, [refreshUploadedList]);
 
   // Load annotations from localStorage khi component mount
   useEffect(() => {
@@ -67,35 +103,132 @@ function App() {
     };
   }, [file]);
 
-  const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    console.log('File selected:', selectedFile);
+  const handleFileChange = async (event) => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) {
+      alert('Vui lòng chọn file PDF!');
+      return;
+    }
+    if (selectedFile.type !== 'application/pdf') {
+      alert(`File không phải PDF! Loại file: ${selectedFile.type || 'unknown'}`);
+      return;
+    }
 
-    if (selectedFile) {
-      if (selectedFile.type === 'application/pdf') {
-        console.log('PDF file type confirmed, size:', selectedFile.size);
-        // Tạo object URL để đảm bảo file được xử lý đúng
-        const fileUrl = URL.createObjectURL(selectedFile);
-        console.log('File URL created:', fileUrl);
-        setFile(fileUrl);
-        setFileName(selectedFile.name);
+    // Auto-suggest catalog dựa trên tên file
+    const suggested = suggestCatalog(selectedFile.name);
+    setUploadCatalog(suggested);
+    setPendingFile(selectedFile);
+    setShowUploadModal(true);
+    event.target.value = '';
+  };
 
-        // Load annotations cho file này nếu có
-        const fileAnnotations = localStorage.getItem(`pdf-annotations-${selectedFile.name}`);
-        if (fileAnnotations) {
-          try {
-            setAnnotations(JSON.parse(fileAnnotations));
-          } catch (e) {
-            console.error('Lỗi khi tải ghi chú cho file:', e);
-          }
-        } else {
+  const handleConfirmUpload = async () => {
+    if (!pendingFile) return;
+
+    // Revoke URL cũ nếu có (tránh rò rỉ bộ nhớ)
+    if (fileUrlRef.current) {
+      URL.revokeObjectURL(fileUrlRef.current);
+      fileUrlRef.current = null;
+    }
+
+    try {
+      // Lưu vào IndexedDB với catalog
+      await savePdf(pendingFile, uploadCatalog);
+      await refreshUploadedList();
+    } catch (e) {
+      console.error('Lỗi khi lưu PDF:', e);
+      alert('Không thể lưu PDF vào danh sách.');
+    }
+
+    const fileUrl = URL.createObjectURL(pendingFile);
+    fileUrlRef.current = fileUrl;
+    setCurrentPdfId(null);
+    setFile(fileUrl);
+    setFileName(pendingFile.name);
+
+    const fileAnnotations = localStorage.getItem(`pdf-annotations-${pendingFile.name}`);
+    if (fileAnnotations) {
+      try {
+        setAnnotations(JSON.parse(fileAnnotations));
+      } catch (e) {
+        console.error('Lỗi khi tải ghi chú cho file:', e);
+        setAnnotations([]);
+      }
+    } else {
+      setAnnotations([]);
+    }
+
+    setShowUploadModal(false);
+    setPendingFile(null);
+    setUploadCatalog(null);
+  };
+
+  const handleSelectFromList = async (id, name) => {
+    try {
+      const data = await getPdfData(id);
+      if (fileUrlRef.current) {
+        URL.revokeObjectURL(fileUrlRef.current);
+        fileUrlRef.current = null;
+      }
+      setCurrentPdfId(id);
+      setFile(data); // ArrayBuffer - viewer hỗ trợ
+      setFileName(name);
+      const fileAnnotations = localStorage.getItem(`pdf-annotations-${name}`);
+      if (fileAnnotations) {
+        try {
+          setAnnotations(JSON.parse(fileAnnotations));
+        } catch {
           setAnnotations([]);
         }
       } else {
-        alert(`File không phải PDF! Loại file: ${selectedFile.type || 'unknown'}`);
+        setAnnotations([]);
+      }
+    } catch (e) {
+      console.error('Lỗi khi mở PDF:', e);
+      alert('Không thể mở PDF.');
+    }
+  };
+
+  const handleRemoveFromList = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Xóa PDF này khỏi danh sách?')) return;
+    try {
+      await deletePdf(id);
+      await refreshUploadedList();
+      if (currentPdfId === id) {
+        setFile(null);
+        setFileName('');
+        setAnnotations([]);
+        setCurrentPdfId(null);
+      }
+    } catch (e) {
+      console.error('Lỗi khi xóa PDF:', e);
+      alert('Không thể xóa PDF.');
+    }
+  };
+
+  const handleGoogleDriveFileSelect = ({ file, fileName }) => {
+    // Revoke URL cũ nếu có
+    if (fileUrlRef.current) {
+      URL.revokeObjectURL(fileUrlRef.current);
+      fileUrlRef.current = null;
+    }
+
+    fileUrlRef.current = file;
+    setCurrentPdfId(null);
+    setFile(file);
+    setFileName(fileName);
+
+    // Load annotations cho file này nếu có
+    const fileAnnotations = localStorage.getItem(`pdf-annotations-${fileName}`);
+    if (fileAnnotations) {
+      try {
+        setAnnotations(JSON.parse(fileAnnotations));
+      } catch {
+        setAnnotations([]);
       }
     } else {
-      alert('Vui lòng chọn file PDF!');
+      setAnnotations([]);
     }
   };
 
@@ -155,7 +288,7 @@ function App() {
             localStorage.setItem(`pdf-annotations-${fileName}`, JSON.stringify(imported));
           }
           alert('Đã nhập ghi chú thành công!');
-        } catch (err) {
+        } catch {
           alert('Lỗi khi đọc file ghi chú!');
         }
       };
@@ -168,10 +301,11 @@ function App() {
       {!file && (
         <header className="app-header">
           <div className="header-content">
-            <h1>📚 PDF Reader - bà già (baza)</h1>
+            <h1>📚 {t('app.title')}</h1>
             <div className="header-actions">
+              <LanguageSelector />
               <label className="file-input-label">
-                📁 Chọn PDF
+                📁 {t('header.selectPdf') || 'Chọn PDF'}
                 <input
                   type="file"
                   accept=".pdf"
@@ -189,9 +323,14 @@ function App() {
         <div className={`app-header-minimal ${showHeader ? 'visible' : 'hidden'}`}>
           <button
             onClick={() => {
+              if (fileUrlRef.current) {
+                URL.revokeObjectURL(fileUrlRef.current);
+                fileUrlRef.current = null;
+              }
               setFile(null);
               setFileName('');
               setAnnotations([]);
+              setCurrentPdfId(null);
             }}
             className="back-btn"
             title="Quay lại"
@@ -228,35 +367,236 @@ function App() {
             showHeader={showHeader}
           />
         ) : (
-          <div className="welcome-screen">
-            <div className="welcome-content">
-              <h2>👋 Chào mừng đến với PDF Reader!</h2>
-              <p>Ứng dụng đọc PDF với đầy đủ tính năng ghi chú và điều hướng</p>
-              <label className="file-input-label large">
-                📁 Chọn file PDF để bắt đầu
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
-                />
-              </label>
-              <div className="features">
-                <h3>✨ Tính năng:</h3>
-                <ul>
-                  <li>📖 Đọc PDF mượt mà</li>
-                  <li>📝 Ghi chú trực tiếp trên PDF</li>
-                  <li>🔍 Zoom in/out</li>
-                  <li>📑 Điều hướng trang dễ dàng</li>
-                  <li>💾 Tự động lưu ghi chú</li>
-                  <li>📤 Xuất/Nhập ghi chú</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+          <AppRoutes 
+            handleFileChange={handleFileChange}
+            handleConfirmUpload={handleConfirmUpload}
+            handleGoogleDriveFileSelect={handleGoogleDriveFileSelect}
+            showUploadModal={showUploadModal}
+            setShowUploadModal={setShowUploadModal}
+            pendingFile={pendingFile}
+            setPendingFile={setPendingFile}
+            uploadCatalog={uploadCatalog}
+            setUploadCatalog={setUploadCatalog}
+          />
         )}
       </main>
     </div>
+  );
+}
+
+// Language redirect component
+function LanguageRedirect() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  useEffect(() => {
+    const savedLang = getCurrentLanguage();
+    const path = location.pathname === '/' ? '' : location.pathname.replace(/^\/(en|vi)/, '');
+    navigate(`/${savedLang}${path}`, { replace: true });
+  }, [navigate, location.pathname]);
+  
+  return null;
+}
+
+// Main routes component with language support
+function AppRoutes({
+  handleFileChange,
+  handleConfirmUpload,
+  handleGoogleDriveFileSelect,
+  showUploadModal,
+  setShowUploadModal,
+  pendingFile,
+  setPendingFile,
+  uploadCatalog,
+  setUploadCatalog,
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [lang, setLang] = useState(() => {
+    const match = location.pathname.match(/^\/(en|vi)(\/|$)/);
+    return match ? match[1] : 'vi';
+  });
+
+  // Extract language from URL and sync
+  useEffect(() => {
+    const match = location.pathname.match(/^\/(en|vi)(\/|$)/);
+    const newLang = match ? match[1] : 'vi';
+    if (newLang !== lang) {
+      setLang(newLang);
+      setCurrentLanguage(newLang);
+      // Trigger language change event for all components
+      window.dispatchEvent(new Event('languagechange'));
+    }
+  }, [location.pathname, lang]);
+
+  const navigateWithLang = (path) => {
+    const cleanPath = path.replace(/^\/(en|vi)/, '');
+    navigate(`/${lang}${cleanPath}`);
+  };
+
+  return (
+    <Routes>
+      {/* Language routes */}
+      <Route path="/:lang/*" element={
+        <LanguageRoutes
+          lang={lang}
+          navigateWithLang={navigateWithLang}
+          handleFileChange={handleFileChange}
+          handleConfirmUpload={handleConfirmUpload}
+          handleGoogleDriveFileSelect={handleGoogleDriveFileSelect}
+          showUploadModal={showUploadModal}
+          setShowUploadModal={setShowUploadModal}
+          pendingFile={pendingFile}
+          setPendingFile={setPendingFile}
+          uploadCatalog={uploadCatalog}
+          setUploadCatalog={setUploadCatalog}
+        />
+      } />
+      {/* Default redirect to /vi */}
+      <Route path="*" element={<LanguageRedirect />} />
+    </Routes>
+  );
+}
+
+// Routes with language prefix
+function LanguageRoutes({
+  lang,
+  navigateWithLang,
+  handleFileChange,
+  handleConfirmUpload,
+  handleGoogleDriveFileSelect,
+  showUploadModal,
+  setShowUploadModal,
+  pendingFile,
+  setPendingFile,
+  uploadCatalog,
+  setUploadCatalog,
+}) {
+  return (
+    <Routes>
+      {/* Home Route */}
+      <Route 
+        path="/" 
+        element={
+                <div className="welcome-screen">
+                  <div className="welcome-content">
+                    <h2>👋 {t('app.welcome')}</h2>
+                    <p>{t('app.description')}</p>
+                    
+                    <div className="main-actions">
+                      <label className="file-input-label large">
+                        📁 {t('app.upload')}
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={handleFileChange}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+
+                      <button
+                        onClick={() => navigateWithLang('/drive')}
+                        className="view-nav-btn drive-btn"
+                      >
+                        ☁️ {t('app.googleDrive')}
+                        <span className="btn-description">{t('app.feature.drive')}</span>
+                      </button>
+
+                      <button
+                        onClick={() => navigateWithLang('/uploaded-list')}
+                        className="view-nav-btn manage-btn"
+                      >
+                        📋 {t('app.manageFiles')}
+                        <span className="btn-description">{t('app.feature.manage')}</span>
+                      </button>
+                    </div>
+
+                    {/* Upload Modal với Catalog Selector */}
+                    {showUploadModal && pendingFile && (
+                      <div className="upload-modal-overlay" onClick={() => setShowUploadModal(false)}>
+                        <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
+                          <h3>📤 Upload PDF</h3>
+                          <div className="upload-modal-content">
+                            <p><strong>File:</strong> {pendingFile.name}</p>
+                            <CatalogSelector
+                              fileName={pendingFile.name}
+                              selectedCatalog={uploadCatalog}
+                              onCatalogChange={setUploadCatalog}
+                            />
+                          </div>
+                          <div className="upload-modal-actions">
+                            <button onClick={handleConfirmUpload} className="confirm-upload-btn">
+                              ✅ Upload
+                            </button>
+                            <button onClick={() => {
+                              setShowUploadModal(false);
+                              setPendingFile(null);
+                              setUploadCatalog(null);
+                            }} className="cancel-upload-btn">
+                              ❌ Hủy
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="features">
+                      <h3>✨ {t('app.features')}:</h3>
+                      <ul>
+                        <li>📤 {t('app.feature.upload')}</li>
+                        <li>📋 {t('app.feature.manage')}</li>
+                        <li>☁️ {t('app.feature.drive')}</li>
+                        <li>📖 {t('app.feature.read')}</li>
+                        <li>📝 {t('app.feature.annotate')}</li>
+                        <li>🔍 {t('app.feature.zoom')}</li>
+                        <li>📑 {t('app.feature.navigate')}</li>
+                        <li>💾 {t('app.feature.save')}</li>
+                        <li>📥 {t('app.feature.export')}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              } 
+            />
+
+            {/* Google Drive Route */}
+            <Route 
+              path="/drive" 
+              element={
+                <div className="drive-view-container" key={lang}>
+                  <div className="view-header">
+                    <button 
+                      onClick={() => navigateWithLang('/')} 
+                      className="back-to-home-btn"
+                    >
+                      {t('app.backToHome')}
+                    </button>
+                    <h2>☁️ {t('app.googleDrive')}</h2>
+                  </div>
+                  <GoogleDriveViewer onFileSelect={handleGoogleDriveFileSelect} />
+                </div>
+              } 
+            />
+
+            {/* File Manager Route */}
+            <Route 
+              path="/uploaded-list" 
+              element={
+                <div className="manage-view-container" key={lang}>
+                  <div className="view-header">
+                    <button 
+                      onClick={() => navigateWithLang('/')} 
+                      className="back-to-home-btn"
+                    >
+                      {t('app.backToHome')}
+                    </button>
+                    <h2>📋 {t('fileManager.title')}</h2>
+                  </div>
+                  <FileManager onFileSelect={handleGoogleDriveFileSelect} />
+                </div>
+              } 
+            />
+          </Routes>
   );
 }
 
