@@ -661,19 +661,7 @@
   color: #333;
 }
 
-.drive-view-container,
-.manage-view-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.drive-view-container > div:last-child,
-.manage-view-container > div:last-child {
-  flex: 1;
-  overflow: hidden;
-}
+/* CSS đã được định nghĩa ở trên, không cần duplicate */
 
 .welcome-content h2 {
   color: #333;
