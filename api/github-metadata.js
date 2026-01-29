@@ -56,9 +56,10 @@ async function getFileSha() {
 async function getFileContent() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Giảm xuống 15s để nhanh hơn
     
     try {
+      console.log(`[GitHub Metadata] Đang fetch từ GitHub API: ${GITHUB_OWNER}/${GITHUB_REPO}/${FILE_PATH}`);
       const response = await fetch(
         `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
         {
@@ -74,17 +75,27 @@ async function getFileContent() {
       if (response.ok) {
         const data = await response.json();
         const content = Buffer.from(data.content, 'base64').toString('utf-8');
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        console.log(`[GitHub Metadata] Đọc thành công: ${parsed.catalogs?.length || 0} catalogs, ${parsed.files?.length || 0} files`);
+        return parsed;
+      } else if (response.status === 404) {
+        console.log('[GitHub Metadata] File không tồn tại (404)');
+        return null;
+      } else {
+        console.warn(`[GitHub Metadata] GitHub API trả về status ${response.status}`);
+        return null;
       }
-      return null;
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn('[GitHub Metadata] getFileContent timeout sau 20s');
+        console.warn('[GitHub Metadata] getFileContent timeout sau 15s');
+      } else {
+        console.error('[GitHub Metadata] Lỗi fetch:', fetchError.message);
       }
       return null;
     }
   } catch (error) {
+    console.error('[GitHub Metadata] Lỗi trong getFileContent:', error.message);
     return null;
   }
 }
@@ -103,14 +114,17 @@ export default async function handler(request) {
 
   if (request.method === 'GET') {
     try {
+      console.log('[GitHub Metadata] GET request - Đang lấy file content...');
       const metadata = await getFileContent();
       if (metadata) {
+        console.log('[GitHub Metadata] Tìm thấy metadata trên GitHub');
         return new Response(
           JSON.stringify(metadata),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
       } else {
         // File chưa tồn tại, trả về empty
+        console.log('[GitHub Metadata] File chưa tồn tại, trả về empty metadata');
         return new Response(
           JSON.stringify({
             catalogs: [],
@@ -122,6 +136,19 @@ export default async function handler(request) {
       }
     } catch (error) {
       console.error('[GitHub Metadata] Lỗi khi đọc:', error);
+      console.error('[GitHub Metadata] Chi tiết lỗi:', error.message, error.stack);
+      // Nếu lỗi là 404, trả về empty metadata thay vì error
+      if (error.message && error.message.includes('404')) {
+        console.log('[GitHub Metadata] File không tồn tại (404), trả về empty');
+        return new Response(
+          JSON.stringify({
+            catalogs: [],
+            files: [],
+            lastSync: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
       return new Response(
         JSON.stringify({ 
           error: 'Không thể đọc metadata từ GitHub',
