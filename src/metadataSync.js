@@ -8,15 +8,46 @@
  */
 export async function loadMetadataFromCloud() {
   try {
-    const response = await fetch('/api/get-metadata');
-    if (!response.ok) {
-      // Nếu API không khả dụng, trả về null để dùng local
-      return null;
+    console.log('[Metadata Sync] Đang load metadata từ cloud...');
+    
+    // Thêm timeout cho fetch request (45s để tránh 504)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    
+    try {
+      const response = await fetch('/api/get-metadata', {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[Metadata Sync] API trả về lỗi ${response.status}:`, errorText);
+        // Nếu API không khả dụng, trả về null để dùng local
+        return null;
+      }
+      
+      const metadata = await response.json();
+      
+      // Nếu metadata có error field (timeout), vẫn trả về để app biết
+      if (metadata.error && metadata.error.includes('Timeout')) {
+        console.warn('[Metadata Sync] API timeout, dùng local data');
+        return null;
+      }
+      
+      console.log(`[Metadata Sync] Load thành công: ${metadata.catalogs?.length || 0} catalogs, ${metadata.files?.length || 0} files`);
+      return metadata;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn('[Metadata Sync] Request timeout sau 45s, dùng local data');
+        return null;
+      }
+      throw fetchError;
     }
-    const metadata = await response.json();
-    return metadata;
   } catch (error) {
-    console.warn('Không thể load metadata từ cloud:', error.message);
+    console.error('[Metadata Sync] Lỗi khi load metadata từ cloud:', error);
+    console.warn('[Metadata Sync] Chi tiết lỗi:', error.message, error.stack);
     return null;
   }
 }
