@@ -49,6 +49,20 @@ export function suggestCatalog(fileName) {
 }
 
 /**
+ * Sync catalogs và files lên cloud (background, không block)
+ * Import từ pdfStorage để tránh circular dependency
+ */
+async function syncMetadataToCloud() {
+  try {
+    const { syncMetadataToCloud: syncFn } = await import('./pdfStorage');
+    await syncFn();
+  } catch (error) {
+    // Silent fail - không block UI
+    console.warn('Background sync failed:', error.message);
+  }
+}
+
+/**
  * Mở database và đảm bảo object store 'catalogs' tồn tại
  * Sử dụng cùng logic với pdfStorage để đảm bảo consistency
  */
