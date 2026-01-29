@@ -53,15 +53,33 @@
    vercel --prod
    ```
 
-### 3. **Lỗi: "File size quá lớn"**
+### 3. **Lỗi 504: Gateway Timeout**
+
+#### Nguyên nhân:
+- **Vercel Hobby plan**: Function timeout mặc định 10s, có thể config lên 60s
+- File quá lớn (> 5MB) upload chậm
+- Network chậm
+
+#### Fix:
+- ✅ **Đã fix**: Function timeout đã được tăng lên 60s trong code
+- Upload file nhỏ hơn 5MB để đảm bảo thành công
+- App sẽ tự động fallback về IndexedDB nếu timeout
+- Kiểm tra kết nối mạng
+
+#### Giới hạn Vercel Hobby:
+- **Function timeout**: 10s default → 60s max (đã config)
+- **Blob Storage**: 1GB/month, 2,000 advanced operations/month
+- **Khuyến nghị**: Upload file < 5MB để tránh timeout
+
+### 4. **Lỗi: "File size quá lớn"**
 
 #### Giới hạn:
-- **Free tier**: 4.5MB per request
-- **Pro tier**: 4.5MB per request (có thể tăng với config)
+- **Khuyến nghị**: < 5MB để tránh timeout trên Hobby plan
+- **Tối đa**: 10MB (sẽ có warning)
 
 #### Fix:
 - Nén PDF trước khi upload
-- Hoặc upgrade plan
+- Hoặc upgrade lên Pro plan (timeout lên đến 300s)
 
 ### 4. **Upload thành công nhưng không hiển thị trong danh sách**
 
@@ -88,14 +106,16 @@
 ### 6. **Upload chậm hoặc timeout**
 
 #### Nguyên nhân:
-- File quá lớn
+- File quá lớn (> 5MB)
 - Network chậm
-- Vercel function timeout (10s cho free tier)
+- Vercel function timeout (10s default, 60s max cho Hobby)
 
 #### Fix:
-- Giảm file size
+- ✅ **Đã fix**: Timeout đã được tăng lên 60s
+- Giảm file size xuống < 5MB
 - Kiểm tra network connection
-- Upgrade plan để có timeout dài hơn
+- App sẽ tự động fallback về IndexedDB nếu timeout
+- Upgrade lên Pro plan để có timeout lên đến 300s
 
 ## 🛠️ Debug Steps
 
@@ -133,8 +153,26 @@ Thử upload file PDF nhỏ (< 1MB) để xem có phải vấn đề file size k
 - [ ] Đã tạo Vercel Blob Store
 - [ ] Environment variable `BLOB_READ_WRITE_TOKEN` đã được set tự động
 - [ ] File `/api/upload-pdf.js` tồn tại và đúng format
+- [ ] Function timeout đã được config (60s cho Hobby plan)
 - [ ] Đã test upload local với `vercel dev`
-- [ ] Đã kiểm tra file size không quá 4.5MB
+- [ ] Đã kiểm tra file size khuyến nghị < 5MB
+
+## ⚠️ Lưu ý cho Vercel Hobby Plan
+
+### Giới hạn:
+- **Function timeout**: 10s default → **60s max** (đã config trong code)
+- **Blob Storage**: 1GB/month, 2,000 operations/month
+- **Khuyến nghị file size**: < 5MB để tránh timeout
+
+### Fallback tự động:
+- Nếu upload timeout hoặc fail → App tự động fallback về IndexedDB (local storage)
+- File vẫn được lưu và có thể đọc, nhưng chỉ trên browser hiện tại
+- Không sync giữa các devices
+
+### Upgrade lên Pro nếu:
+- Cần upload file lớn hơn (> 5MB)
+- Cần timeout dài hơn (lên đến 300s)
+- Cần nhiều storage hơn
 
 ## 🔗 Tài liệu tham khảo
 
