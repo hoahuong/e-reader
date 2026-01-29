@@ -10,7 +10,7 @@
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 10,
+  maxDuration: 60, // Tăng timeout lên 60s (max cho Hobby plan)
 };
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -20,21 +20,34 @@ const FILE_PATH = 'data/metadata.json';
 
 async function getFileSha() {
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
-      {
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
+        {
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+          },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
-      return data.sha;
+      if (response.ok) {
+        const data = await response.json();
+        return data.sha;
+      }
+      return null;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn('[GitHub Metadata] getFileSha timeout sau 20s');
+      }
+      return null;
     }
-    return null;
   } catch (error) {
     return null;
   }
@@ -42,22 +55,35 @@ async function getFileSha() {
 
 async function getFileContent() {
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
-      {
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
+        {
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+          },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
-      const content = Buffer.from(data.content, 'base64').toString('utf-8');
-      return JSON.parse(content);
+      if (response.ok) {
+        const data = await response.json();
+        const content = Buffer.from(data.content, 'base64').toString('utf-8');
+        return JSON.parse(content);
+      }
+      return null;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn('[GitHub Metadata] getFileContent timeout sau 20s');
+      }
+      return null;
     }
-    return null;
   } catch (error) {
     return null;
   }
@@ -121,39 +147,57 @@ export default async function handler(request) {
       const content = JSON.stringify(metadata, null, 2);
       const encodedContent = Buffer.from(content).toString('base64');
 
-      // Lấy SHA của file hiện tại (nếu có)
+      // Lấy SHA của file hiện tại (nếu có) với timeout
+      console.log('[GitHub Metadata] Đang lấy SHA của file hiện tại...');
       const sha = await getFileSha();
 
-      const response = await fetch(
-        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: `Update metadata - ${new Date().toISOString()}`,
-            content: encodedContent,
-            sha: sha, // Nếu có SHA thì update, không có thì tạo mới
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        return new Response(
-          JSON.stringify({
-            success: true,
-            url: result.content.html_url,
-            lastSync: metadata.lastSync,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
+      // Tạo AbortController với timeout 50s (trước khi function timeout 60s)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
+      
+      try {
+        console.log('[GitHub Metadata] Đang commit file lên GitHub...');
+        const response = await fetch(
+          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FILE_PATH}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: `Update metadata - ${new Date().toISOString()}`,
+              content: encodedContent,
+              sha: sha, // Nếu có SHA thì update, không có thì tạo mới
+            }),
+            signal: controller.signal,
+          }
         );
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `GitHub API error: ${response.status}`);
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[GitHub Metadata] Commit thành công:', result.content.html_url);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              url: result.content.html_url,
+              lastSync: metadata.lastSync,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `GitHub API error: ${response.status}`);
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('[GitHub Metadata] Request timeout sau 50s');
+          throw new Error('Request timeout - GitHub API không phản hồi kịp thời');
+        }
+        throw fetchError;
       }
     } catch (error) {
       console.error('[GitHub Metadata] Lỗi khi lưu:', error);
