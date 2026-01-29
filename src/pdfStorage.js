@@ -10,7 +10,7 @@
 /**
  * Sync metadata lên cloud (background, không block)
  */
-async function syncMetadataToCloud() {
+export async function syncMetadataToCloud() {
   try {
     const { getAllCatalogs } = await import('./catalogManager');
     const { listPdfs } = await import('./pdfStorage');
