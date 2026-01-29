@@ -403,6 +403,10 @@ function App() {
             setPendingFile={setPendingFile}
             uploadCatalog={uploadCatalog}
             setUploadCatalog={setUploadCatalog}
+            uploadError={uploadError}
+            setUploadError={setUploadError}
+            isUploading={isUploading}
+            setIsUploading={setIsUploading}
           />
         )}
       </main>
@@ -435,6 +439,10 @@ function AppRoutes({
   setPendingFile,
   uploadCatalog,
   setUploadCatalog,
+  uploadError,
+  setUploadError,
+  isUploading,
+  setIsUploading,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -476,6 +484,10 @@ function AppRoutes({
           setPendingFile={setPendingFile}
           uploadCatalog={uploadCatalog}
           setUploadCatalog={setUploadCatalog}
+          uploadError={uploadError}
+          setUploadError={setUploadError}
+          isUploading={isUploading}
+          setIsUploading={setIsUploading}
         />
       } />
       {/* Default redirect to /vi */}
@@ -497,6 +509,10 @@ function LanguageRoutes({
   setPendingFile,
   uploadCatalog,
   setUploadCatalog,
+  uploadError,
+  setUploadError,
+  isUploading,
+  setIsUploading,
 }) {
   return (
     <Routes>
