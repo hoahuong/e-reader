@@ -391,9 +391,19 @@ function FileManager({ onFileSelect }) {
     <div className="file-manager" key={lang}>
       <div className="file-manager-header">
         <h2>📋 {t('fileManager.title')}</h2>
-        <button onClick={handleCreateCatalog} className="create-catalog-btn-header">
-          {t('fileManager.createCatalog')}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            onClick={handleManualSync} 
+            className="create-catalog-btn-header"
+            style={{ fontSize: '14px', padding: '8px 12px' }}
+            title="Sync metadata từ cloud"
+          >
+            🔄 Sync
+          </button>
+          <button onClick={handleCreateCatalog} className="create-catalog-btn-header">
+            ➕ {t('fileManager.createCatalog')}
+          </button>
+        </div>
       </div>
 
       {/* Catalogs */}
