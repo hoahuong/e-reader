@@ -116,6 +116,21 @@ function App() {
       return;
     }
 
+    // Kiểm tra file size và cảnh báo nếu quá lớn
+    const fileSizeMB = selectedFile.size / (1024 * 1024);
+    if (fileSizeMB > 5) {
+      const proceed = confirm(
+        `File size: ${fileSizeMB.toFixed(2)}MB\n\n` +
+        `File lớn có thể gây timeout trên Vercel Hobby plan (10-60s limit).\n` +
+        `Khuyến nghị: Upload file < 5MB để đảm bảo thành công.\n\n` +
+        `Bạn có muốn tiếp tục không?`
+      );
+      if (!proceed) {
+        event.target.value = '';
+        return;
+      }
+    }
+
     // Auto-suggest catalog dựa trên tên file
     const suggested = suggestCatalog(selectedFile.name);
     setUploadCatalog(suggested);
