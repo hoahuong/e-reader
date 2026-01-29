@@ -4,6 +4,27 @@
   padding: 24px;
   background: #f8f9fa;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Custom scrollbar cho file-manager */
+.file-manager::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-manager::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.file-manager::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.file-manager::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .file-manager-header {
@@ -50,6 +71,9 @@
   padding: 16px;
   border: 2px dashed #e0e0e0;
   min-height: 200px;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
   transition: all 0.2s;
   cursor: grab;
   position: relative;
@@ -100,6 +124,7 @@
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 .catalog-title {
@@ -186,6 +211,31 @@
   flex-direction: column;
   gap: 8px;
   min-height: 100px;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  flex: 1;
+  flex-shrink: 1;
+}
+
+/* Custom scrollbar cho catalog-files */
+.catalog-files::-webkit-scrollbar {
+  width: 6px;
+}
+
+.catalog-files::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.catalog-files::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.catalog-files::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .file-item-draggable {
