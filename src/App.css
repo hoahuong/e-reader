@@ -108,6 +108,48 @@
   /* Sẽ được điều chỉnh khi có minimal header */
 }
 
+/* Container cho các view routes */
+.manage-view-container,
+.drive-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view-header {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.view-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.back-to-home-btn {
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.2s;
+}
+
+.back-to-home-btn:hover {
+  background: #e9ecef;
+  border-color: #667eea;
+}
+
 /* Header minimal giờ là relative nên không cần trừ height */
 /* PDF sẽ tự động được đẩy xuống khi header hiện */
 .app-main:has(.app-header-minimal) {
