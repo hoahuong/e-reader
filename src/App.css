@@ -500,6 +500,34 @@
   background: #e0e0e0;
 }
 
+.cancel-upload-btn:disabled,
+.confirm-upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload-error-message {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #c33;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.upload-error-message strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.upload-error-message small {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
 /* View Navigation */
 .main-actions {
   display: flex;

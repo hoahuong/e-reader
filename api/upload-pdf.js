@@ -59,10 +59,22 @@ export default async function handler(request) {
     );
   } catch (error) {
     console.error('Lỗi khi upload PDF:', error);
+    
+    // Kiểm tra xem có phải lỗi thiếu token không
+    if (error.message && error.message.includes('BLOB_READ_WRITE_TOKEN')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Thiếu cấu hình Vercel Blob Storage',
+          details: 'Vui lòng kiểm tra BLOB_READ_WRITE_TOKEN trong Vercel environment variables'
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: 'Không thể upload PDF',
-        details: error.message 
+        details: error.message || 'Lỗi không xác định'
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
