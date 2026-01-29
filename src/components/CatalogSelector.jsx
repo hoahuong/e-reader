@@ -55,8 +55,10 @@ function CatalogSelector({ fileName, selectedCatalog, onCatalogChange, onNewCata
 
   return (
     <div className="catalog-selector">
-      <label className="catalog-label">
-        📂 Catalog:
+      <div className="catalog-label-wrapper">
+        <label className="catalog-label">
+          📂 Catalog:
+        </label>
         {suggestedCatalog && suggestedCatalog !== selectedCatalog && (
           <span className="catalog-suggestion">
             (Đề xuất: <button 
@@ -68,7 +70,7 @@ function CatalogSelector({ fileName, selectedCatalog, onCatalogChange, onNewCata
             </button>)
           </span>
         )}
-      </label>
+      </div>
       <div className="catalog-input-group">
         <select
           value={selectedCatalog || ''}
