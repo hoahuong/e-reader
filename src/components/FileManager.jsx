@@ -44,26 +44,61 @@ function FileManager({ onFileSelect }) {
       
       // Bước 1: Load metadata từ cloud và sync vào local IndexedDB
       try {
+        console.log('[FileManager] Bắt đầu load metadata từ cloud...');
         const cloudMetadata = await loadMetadataFromCloud();
-        if (cloudMetadata) {
+        if (cloudMetadata && (cloudMetadata.catalogs?.length > 0 || cloudMetadata.files?.length > 0)) {
+          console.log('[FileManager] Tìm thấy metadata trên cloud, đang sync...');
           await syncMetadataToLocal(cloudMetadata);
-          console.log('Metadata đã được sync từ cloud');
+          console.log('[FileManager] Metadata đã được sync từ cloud thành công');
+        } else {
+          console.log('[FileManager] Không có metadata trên cloud hoặc metadata rỗng');
         }
       } catch (syncError) {
-        console.warn('Không thể sync metadata từ cloud, dùng local:', syncError.message);
+        console.error('[FileManager] Lỗi khi sync metadata từ cloud:', syncError);
+        console.error('[FileManager] Chi tiết:', syncError.message, syncError.stack);
         // Tiếp tục với local data nếu sync fail
       }
       
       // Bước 2: Load từ local IndexedDB (đã được sync từ cloud nếu có)
+      console.log('[FileManager] Đang load data từ local IndexedDB...');
       const [filesList, catalogsList] = await Promise.all([
         listPdfs(),
         getAllCatalogs(),
       ]);
+      console.log(`[FileManager] Load thành công: ${catalogsList.length} catalogs, ${filesList.length} files`);
       setFiles(filesList);
       setCatalogs(catalogsList);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('[FileManager] Error loading data:', error);
+      console.error('[FileManager] Chi tiết:', error.message, error.stack);
       setError(`${t('fileManager.error')}: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Thêm hàm manual sync để test
+  const handleManualSync = async () => {
+    try {
+      setLoading(true);
+      console.log('[FileManager] Manual sync được trigger...');
+      const cloudMetadata = await loadMetadataFromCloud();
+      if (cloudMetadata) {
+        await syncMetadataToLocal(cloudMetadata);
+        // Reload data sau khi sync
+        const [filesList, catalogsList] = await Promise.all([
+          listPdfs(),
+          getAllCatalogs(),
+        ]);
+        setFiles(filesList);
+        setCatalogs(catalogsList);
+        alert(`Đã sync thành công: ${catalogsList.length} catalogs, ${filesList.length} files`);
+      } else {
+        alert('Không tìm thấy metadata trên cloud');
+      }
+    } catch (error) {
+      console.error('[FileManager] Manual sync error:', error);
+      alert(`Lỗi khi sync: ${error.message}`);
     } finally {
       setLoading(false);
     }
