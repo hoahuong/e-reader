@@ -3,7 +3,30 @@
  * File PDF được lưu trên Vercel Blob, metadata (id, name, url) được cache trong IndexedDB.
  * 
  * Fallback mode: Nếu API route không khả dụng (local dev), sẽ tự động dùng IndexedDB.
+ * 
+ * Metadata sync: Catalog và file list được sync lên Vercel Blob để đồng bộ giữa các devices.
  */
+
+/**
+ * Sync metadata lên cloud (background, không block)
+ */
+async function syncMetadataToCloud() {
+  try {
+    const { getAllCatalogs } = await import('./catalogManager');
+    const { listPdfs } = await import('./pdfStorage');
+    const { saveMetadataToCloud } = await import('./metadataSync');
+    
+    const [catalogs, files] = await Promise.all([
+      getAllCatalogs(),
+      listPdfs(),
+    ]);
+    
+    await saveMetadataToCloud(catalogs, files);
+  } catch (error) {
+    // Silent fail - không block UI
+    console.warn('Background sync failed:', error.message);
+  }
+}
 
 const DB_NAME = 'PDFReaderDB';
 const MIN_VERSION = 4; // Version tối thiểu để đảm bảo có catalog support
@@ -151,7 +174,11 @@ export async function savePdf(file, catalog = null) {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const req = store.put(record);
-        req.onsuccess = () => resolve({ id: url, name, url, catalog: catalog || null });
+        req.onsuccess = () => {
+          // Sync metadata lên cloud sau khi upload thành công
+          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+          resolve({ id: url, name, url, catalog: catalog || null });
+        };
         req.onerror = () => reject(req.error);
         tx.oncomplete = () => db.close();
       });
@@ -317,8 +344,10 @@ export async function deletePdf(id) {
         const deleteTx = db.transaction(STORE_NAME, 'readwrite');
         const deleteStore = deleteTx.objectStore(STORE_NAME);
         deleteStore.delete(id);
-        deleteTx.oncomplete = () => {
+        deleteTx.oncomplete = async () => {
           db.close();
+          // Sync metadata lên cloud sau khi xóa file
+          syncMetadataToCloud().catch(() => {}); // Background sync, không block
           resolve();
         };
         deleteTx.onerror = () => reject(deleteTx.error);

@@ -162,8 +162,10 @@ export async function createCatalog(name, description = '') {
       const store = tx.objectStore(CATALOG_STORE_NAME);
       const req = store.add(catalog);
       req.onsuccess = () => {
-        tx.oncomplete = () => {
+        tx.oncomplete = async () => {
           db.close();
+          // Sync lên cloud sau khi tạo catalog
+          syncMetadataToCloud().catch(() => {}); // Background sync, không block
           resolve(catalog);
         };
       };
@@ -201,7 +203,11 @@ export async function updateCatalog(catalogId, newName, newDescription = null) {
           putReq.onerror = () => reject(putReq.error);
         };
         getReq.onerror = () => reject(getReq.error);
-        tx.oncomplete = () => db.close();
+        tx.oncomplete = async () => {
+          db.close();
+          // Sync lên cloud sau khi update catalog
+          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+        };
       })
       .catch(reject);
   });
@@ -241,8 +247,10 @@ export async function updateCatalogOrder(catalogIds) {
 
         Promise.all(updates)
           .then(() => {
-            tx.oncomplete = () => {
+            tx.oncomplete = async () => {
               db.close();
+              // Sync lên cloud sau khi update order
+              syncMetadataToCloud().catch(() => {}); // Background sync, không block
               resolve();
             };
           })
@@ -266,7 +274,11 @@ export async function deleteCatalog(catalogId) {
         const req = store.delete(catalogId);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
-        tx.oncomplete = () => db.close();
+        tx.oncomplete = async () => {
+          db.close();
+          // Sync lên cloud sau khi xóa catalog
+          syncMetadataToCloud().catch(() => {}); // Background sync, không block
+        };
       })
       .catch(reject);
   });

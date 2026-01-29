@@ -7,6 +7,7 @@ import CatalogSelector from './components/CatalogSelector';
 import LanguageSelector from './components/LanguageSelector';
 import { savePdf, listPdfs, getPdfData, deletePdf } from './pdfStorage';
 import { suggestCatalog } from './catalogManager';
+import { loadMetadataFromCloud, syncMetadataToLocal } from './metadataSync';
 import { t, getCurrentLanguage, setCurrentLanguage } from './i18n/locales';
 import './App.css';
 
@@ -30,10 +31,23 @@ function App() {
   const fileUrlRef = useRef(null); // để revoke object URL khi đổi file
 
 
-  // Load danh sách PDF đã upload từ IndexedDB
+  // Load danh sách PDF đã upload từ IndexedDB và sync từ cloud
   const refreshUploadedList = useCallback(async () => {
     try {
       setListLoading(true);
+      
+      // Sync metadata từ cloud trước khi load local
+      try {
+        const cloudMetadata = await loadMetadataFromCloud();
+        if (cloudMetadata) {
+          await syncMetadataToLocal(cloudMetadata);
+          console.log('Metadata đã được sync từ cloud vào App');
+        }
+      } catch (syncError) {
+        console.warn('Không thể sync metadata từ cloud:', syncError.message);
+        // Tiếp tục với local data nếu sync fail
+      }
+      
       const list = await listPdfs();
       setUploadedList(list);
     } catch (e) {

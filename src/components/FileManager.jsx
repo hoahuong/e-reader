@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { listPdfs, deletePdf, getPdfData } from '../pdfStorage';
 import { getAllCatalogs, createCatalog, updateCatalog, deleteCatalog, updateCatalogOrder } from '../catalogManager';
 import { openDB } from '../pdfStorage';
+import { loadMetadataFromCloud, syncMetadataToLocal, saveMetadataToCloud } from '../metadataSync';
 import { t, getCurrentLanguage } from '../i18n/locales';
 import './FileManager.css';
 
@@ -40,6 +41,20 @@ function FileManager({ onFileSelect }) {
     try {
       setLoading(true);
       setError(null);
+      
+      // Bước 1: Load metadata từ cloud và sync vào local IndexedDB
+      try {
+        const cloudMetadata = await loadMetadataFromCloud();
+        if (cloudMetadata) {
+          await syncMetadataToLocal(cloudMetadata);
+          console.log('Metadata đã được sync từ cloud');
+        }
+      } catch (syncError) {
+        console.warn('Không thể sync metadata từ cloud, dùng local:', syncError.message);
+        // Tiếp tục với local data nếu sync fail
+      }
+      
+      // Bước 2: Load từ local IndexedDB (đã được sync từ cloud nếu có)
       const [filesList, catalogsList] = await Promise.all([
         listPdfs(),
         getAllCatalogs(),
@@ -127,7 +142,11 @@ function FileManager({ onFileSelect }) {
 
     try {
       const catalog = await createCatalog(name.trim());
-      setCatalogs([...catalogs, catalog]);
+      const updatedCatalogs = [...catalogs, catalog];
+      setCatalogs(updatedCatalogs);
+      
+      // Sync metadata lên cloud sau khi tạo catalog (đã được sync trong createCatalog, nhưng sync lại để đảm bảo)
+      saveMetadataToCloud(updatedCatalogs, files).catch(() => {}); // Background sync
     } catch (error) {
       console.error('Error creating catalog:', error);
       alert('Không thể tạo catalog: ' + error.message);
@@ -220,10 +239,16 @@ function FileManager({ onFileSelect }) {
         };
       });
 
-      setCatalogs(catalogs.filter(c => c.id !== catalogId));
-      setFiles(files.map(f => 
+      const updatedCatalogs = catalogs.filter(c => c.id !== catalogId);
+      const updatedFiles = files.map(f => 
         f.catalog === catalog.name ? { ...f, catalog: null } : f
-      ));
+      );
+      
+      setCatalogs(updatedCatalogs);
+      setFiles(updatedFiles);
+      
+      // Sync metadata lên cloud sau khi xóa catalog
+      saveMetadataToCloud(updatedCatalogs, updatedFiles).catch(() => {}); // Background sync
     } catch (error) {
       console.error('Error deleting catalog:', error);
       alert('Không thể xóa catalog: ' + error.message);
@@ -235,7 +260,11 @@ function FileManager({ onFileSelect }) {
 
     try {
       await deletePdf(fileId);
-      setFiles(files.filter(f => f.id !== fileId));
+      const updatedFiles = files.filter(f => f.id !== fileId);
+      setFiles(updatedFiles);
+      
+      // Sync metadata lên cloud sau khi xóa file (đã được sync trong deletePdf, nhưng sync lại để đảm bảo)
+      saveMetadataToCloud(catalogs, updatedFiles).catch(() => {}); // Background sync
     } catch (error) {
       console.error('Error deleting file:', error);
       alert('Không thể xóa file: ' + error.message);
