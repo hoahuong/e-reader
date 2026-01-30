@@ -304,7 +304,8 @@ export default async function handler(request) {
       
       if (metadata && typeof metadata === 'object') {
         console.log(`[KV Metadata] Tìm thấy metadata trên Redis (handler duration: ${handlerDuration}ms)`);
-        const response = new Response(
+        // Return ngay lập tức, không log sau khi tạo response
+        return new Response(
           JSON.stringify(metadata),
           { 
             status: 200, 
@@ -314,11 +315,10 @@ export default async function handler(request) {
             } 
           }
         );
-        console.log(`[KV Metadata] Returning response với metadata (total handler time: ${Date.now() - handlerEntryTime}ms)`);
-        return response;
       } else {
         console.log(`[KV Metadata] Không có metadata trên Redis, trả về empty (handler duration: ${handlerDuration}ms)`);
-        const response = new Response(
+        // Return ngay lập tức, không log sau khi tạo response
+        return new Response(
           JSON.stringify({
             catalogs: [],
             files: [],
@@ -332,14 +332,13 @@ export default async function handler(request) {
             } 
           }
         );
-        console.log(`[KV Metadata] Returning response với empty data (total handler time: ${Date.now() - handlerEntryTime}ms)`);
-        return response;
       }
     } catch (error) {
       const handlerDuration = Date.now() - handlerStartTime;
       console.error(`[KV Metadata] Lỗi khi đọc (handler duration: ${handlerDuration}ms):`, error);
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      const response = new Response(
+      // Return ngay lập tức, không log sau khi tạo response
+      return new Response(
         JSON.stringify({ 
           error: 'Không thể đọc metadata từ Redis',
           details: errorMessage
@@ -352,8 +351,6 @@ export default async function handler(request) {
           } 
         }
       );
-      console.log('[KV Metadata] Returning error response');
-      return response;
     }
   }
 
