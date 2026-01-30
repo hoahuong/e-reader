@@ -4,6 +4,7 @@ import PDFViewerDirect from './components/PDFViewerDirect';
 import GoogleDriveViewer from './components/GoogleDriveViewer';
 import FileManager from './components/FileManager';
 import CatalogSelector from './components/CatalogSelector';
+import DriveFolderSelector from './components/DriveFolderSelector';
 import LanguageSelector from './components/LanguageSelector';
 import { savePdf, listPdfs, getPdfData, deletePdf } from './pdfStorage';
 import { suggestCatalog } from './catalogManager';
@@ -21,6 +22,8 @@ function App() {
   const [currentPdfId, setCurrentPdfId] = useState(null); // id trong DB khi đang đọc từ danh sách
   const [selectedCatalog, setSelectedCatalog] = useState(null); // Catalog được chọn để filter
   const [uploadCatalog, setUploadCatalog] = useState(null); // Catalog khi upload
+  const [uploadDriveFolderId, setUploadDriveFolderId] = useState(null); // Google Drive folder khi upload
+  const [uploadDriveFolderName, setUploadDriveFolderName] = useState(null); // Folder name để hiển thị
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const [uploadError, setUploadError] = useState(null);
@@ -181,14 +184,21 @@ function App() {
     }
 
     try {
-      // Lưu vào IndexedDB với catalog
-      await savePdf(pendingFile, uploadCatalog);
+      // Lưu folder preference vào localStorage
+      if (uploadDriveFolderId) {
+        localStorage.setItem('pdf-upload-folder-id', uploadDriveFolderId);
+      }
+      
+      // Lưu vào IndexedDB với catalog và drive folder
+      await savePdf(pendingFile, uploadCatalog, uploadDriveFolderId);
       await refreshUploadedList();
 
       // Đóng modal TRƯỚC khi set file để tránh modal che PDF
       setShowUploadModal(false);
       setPendingFile(null);
       setUploadCatalog(null);
+      setUploadDriveFolderId(null);
+      setUploadDriveFolderName(null);
       setUploadError(null);
 
       // Nếu upload thành công, mở file để đọc
@@ -607,6 +617,20 @@ function LanguageRoutes({
                               selectedCatalog={uploadCatalog}
                               onCatalogChange={setUploadCatalog}
                             />
+                            <DriveFolderSelector
+                              selectedFolderId={uploadDriveFolderId || localStorage.getItem('pdf-upload-folder-id') || 'root'}
+                              onFolderChange={(folderId, folderName) => {
+                                setUploadDriveFolderId(folderId);
+                                setUploadDriveFolderName(folderName);
+                              }}
+                              onCreateFolder={async (folderName, parentFolderId) => {
+                                const { createDriveFolder } = await import('./services/googleDrive');
+                                const newFolder = await createDriveFolder(folderName, parentFolderId);
+                                setUploadDriveFolderId(newFolder.id);
+                                setUploadDriveFolderName(newFolder.name);
+                                return newFolder;
+                              }}
+                            />
                             {uploadError && (
                               <div className="upload-error-message">
                                 ⚠️ <strong>Lỗi:</strong> {uploadError}
@@ -629,6 +653,8 @@ function LanguageRoutes({
                                   setShowUploadModal(false);
                                   setPendingFile(null);
                                   setUploadCatalog(null);
+                                  setUploadDriveFolderId(null);
+                                  setUploadDriveFolderName(null);
                                   setUploadError(null);
                                   setIsUploading(false);
                                 }

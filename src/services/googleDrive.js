@@ -513,6 +513,37 @@ export async function getFileInfo(fileId) {
 }
 
 /**
+ * Tạo folder mới trên Google Drive
+ * @param {string} folderName - Tên folder
+ * @param {string} parentFolderId - ID của folder cha (optional, default: 'root')
+ * @returns {Promise<{id: string, name: string}>}
+ */
+export async function createDriveFolder(folderName, parentFolderId = 'root') {
+  if (!isLoggedIn()) {
+    throw new Error('Chưa đăng nhập Google');
+  }
+
+  try {
+    const response = await window.gapi.client.drive.files.create({
+      resource: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: parentFolderId !== 'root' ? [parentFolderId] : [],
+      },
+      fields: 'id, name',
+    });
+
+    return {
+      id: response.result.id,
+      name: response.result.name,
+    };
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    throw new Error(error.result?.error?.message || 'Không thể tạo folder');
+  }
+}
+
+/**
  * Upload PDF file lên Google Drive
  * @param {File} file - File PDF cần upload
  * @param {string} folderId - ID của folder trên Google Drive (optional, default: 'root')

@@ -126,7 +126,7 @@ async function savePdfLocal(file, catalog = null) {
  * @param {string} catalog - Catalog name (optional)
  * @returns {Promise<{id: string, name: string, url: string}>} - id, tên và URL đã lưu
  */
-export async function savePdf(file, catalog = null) {
+export async function savePdf(file, catalog = null, driveFolderId = null) {
   if (!file || file.type !== 'application/pdf') {
     throw new Error('File không phải PDF');
   }
@@ -144,9 +144,12 @@ export async function savePdf(file, catalog = null) {
     const googleDriveModule = await import('./services/googleDrive');
     const { isLoggedIn, uploadPdfToDrive } = googleDriveModule;
     
+    // Lấy folderId từ localStorage preference hoặc dùng default
+    const savedFolderId = driveFolderId || localStorage.getItem('pdf-upload-folder-id') || 'root';
+    
     if (isLoggedIn && isLoggedIn()) {
-      console.log('[PDF Storage] Đang upload lên Google Drive...');
-      const result = await uploadPdfToDrive(file, 'root'); // Upload vào root folder
+      console.log(`[PDF Storage] Đang upload lên Google Drive vào folder: ${savedFolderId}`);
+      const result = await uploadPdfToDrive(file, savedFolderId);
       const { id, name, url, driveId } = result;
 
       // Cache metadata trong IndexedDB
