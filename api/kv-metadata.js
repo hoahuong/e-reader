@@ -383,8 +383,19 @@ export default async function handler(request) {
   // Log ngay đầu function để verify function được gọi
   console.log('[KV Metadata] ========== HANDLER START ==========');
   console.log('[KV Metadata] Handler entry time:', new Date().toISOString());
+  console.log('[KV Metadata] Request method:', request?.method);
+  console.log('[KV Metadata] Request URL:', request?.url);
   
   const handlerEntryTime = Date.now();
+  
+  // Early return nếu không phải GET hoặc POST
+  if (request?.method !== 'GET' && request?.method !== 'POST') {
+    console.log('[KV Metadata] Method not allowed:', request?.method);
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   
   try {
     // Kiểm tra Redis đã được setup chưa
