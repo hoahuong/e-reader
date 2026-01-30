@@ -3,20 +3,22 @@
  * Switch giữa các storage options dễ dàng
  * 
  * Options:
- * - 'vercel-kv': Vercel KV Storage (recommended) ⭐
+ * - 'supabase': Supabase Database (recommended) ⭐ Real-time sync
+ * - 'vercel-kv': Vercel KV Storage
  * - 'vercel-blob': Vercel Blob Storage
  * - 'github': GitHub API Storage
  * - 'local': Local Storage only (IndexedDB + localStorage backup)
  */
 
 // Thay đổi giá trị này để switch storage option
-// 'vercel-kv': Vercel KV Storage - Low latency, free tier 30K ops/day (recommended) ⭐
+// 'supabase': Supabase Database - Real-time sync, free tier 500MB (recommended) ⭐
+// 'vercel-kv': Vercel KV Storage - Low latency, free tier 30K ops/day
 // 'vercel-blob': Vercel Blob Storage (cần BLOB_READ_WRITE_TOKEN)
 // 'github': GitHub API Storage (cần GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
 // 'local': Local Storage only - IndexedDB + localStorage backup (không cần config)
 // 
-// Lưu ý: Nếu chọn 'vercel-kv' nhưng chưa setup Redis, app sẽ tự động fallback về 'local'
-const STORAGE_TYPE = 'vercel-kv'; // 'vercel-kv' | 'vercel-blob' | 'github' | 'local'
+// Lưu ý: Nếu chọn 'supabase' nhưng chưa setup, app sẽ tự động fallback về 'local'
+const STORAGE_TYPE = 'supabase'; // 'supabase' | 'vercel-kv' | 'vercel-blob' | 'github' | 'local'
 
 let metadataSyncModule = null;
 
