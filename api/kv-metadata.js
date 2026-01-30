@@ -356,30 +356,34 @@ export default async function handler(request) {
 
   if (request.method === 'POST') {
     try {
-      console.log('[KV Metadata] POST request - request type:', typeof request);
-      console.log('[KV Metadata] POST request - has json method:', typeof request.json);
-      console.log('[KV Metadata] POST request - has body:', !!request.body);
-      
-      // Đảm bảo request có method json() hoặc đọc body theo cách khác
+      // Đảm bảo request là Request object và có thể đọc body
       let data;
-      if (typeof request.json === 'function') {
+      
+      // Kiểm tra xem request có phải là Request object không
+      if (request instanceof Request) {
+        // Request object chuẩn - dùng json() method
+        try {
+          data = await request.json();
+        } catch (jsonError) {
+          // Nếu json() fail, thử đọc text và parse
+          console.warn('[KV Metadata] request.json() failed, trying text():', jsonError.message);
+          const bodyText = await request.text();
+          data = JSON.parse(bodyText);
+        }
+      } else if (typeof request.json === 'function') {
+        // Có method json() nhưng không phải Request object
         data = await request.json();
       } else if (request.body) {
-        // Fallback: đọc từ body nếu request.json() không tồn tại
+        // Fallback: đọc từ body property
         const bodyText = typeof request.body === 'string' 
           ? request.body 
           : await new Response(request.body).text();
         data = JSON.parse(bodyText);
       } else {
-        // Fallback cuối cùng: thử đọc từ request như một stream
-        const bodyText = await new Response(request).text();
-        data = JSON.parse(bodyText);
+        // Fallback cuối cùng: wrap request trong Request object mới
+        const requestObj = new Request(request);
+        data = await requestObj.json();
       }
-      
-      console.log('[KV Metadata] POST request - parsed data:', {
-        catalogsCount: data?.catalogs?.length || 0,
-        filesCount: data?.files?.length || 0,
-      });
       
       const { catalogs, files, lastSync } = data;
 
