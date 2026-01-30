@@ -43,7 +43,10 @@ async function getRedisClient() {
  */
 async function redisGetUpstash(key) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => {
+    console.log('[KV Metadata] Aborting GET request due to timeout');
+    controller.abort();
+  }, 10000); // 10s timeout
   
   try {
     // Upstash REST API: GET command format
@@ -61,12 +64,15 @@ async function redisGetUpstash(key) {
       signal: controller.signal,
     });
     
-    clearTimeout(timeoutId); // Cleanup timeout ngay khi có response
+    // Cleanup timeout ngay khi có response
+    clearTimeout(timeoutId);
     const duration = Date.now() - startTime;
     console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
     if (!response.ok) {
       if (response.status === 404) {
+        // Consume body để đảm bảo connection được đóng
+        await response.text().catch(() => null);
         return null;
       }
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -104,7 +110,8 @@ async function redisGetUpstash(key) {
     
     return null;
   } catch (error) {
-    clearTimeout(timeoutId); // Đảm bảo cleanup timeout trong catch
+    // Đảm bảo cleanup timeout trong catch
+    clearTimeout(timeoutId);
     console.error('[KV Metadata] Redis GET error:', error);
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
@@ -116,7 +123,10 @@ async function redisGetUpstash(key) {
 
 async function redisSetUpstash(key, value) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => {
+    console.log('[KV Metadata] Aborting SET request due to timeout');
+    controller.abort();
+  }, 10000); // 10s timeout
   
   try {
     const valueStr = JSON.stringify(value);
@@ -141,7 +151,8 @@ async function redisSetUpstash(key, value) {
       signal: controller.signal,
     });
     
-    clearTimeout(timeoutId); // Cleanup timeout ngay khi có response
+    // Cleanup timeout ngay khi có response
+    clearTimeout(timeoutId);
     const duration = Date.now() - startTime;
     console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
@@ -162,7 +173,8 @@ async function redisSetUpstash(key, value) {
     const result = await response.json();
     return result;
   } catch (error) {
-    clearTimeout(timeoutId); // Đảm bảo cleanup timeout trong catch
+    // Đảm bảo cleanup timeout trong catch
+    clearTimeout(timeoutId);
     console.error('[KV Metadata] Redis SET error:', error);
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
