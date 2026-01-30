@@ -18,13 +18,8 @@
   if (!globals.URL) {
     try {
       // Thử dùng require (CommonJS) - hoạt động trong Node.js
-      // Sử dụng createRequire để tương thích với ESM
       let urlModule = null;
       if (typeof require !== 'undefined') {
-        urlModule = require('url');
-      } else if (typeof createRequire !== 'undefined') {
-        const { createRequire } = await import('module');
-        const require = createRequire(import.meta.url);
         urlModule = require('url');
       }
       
@@ -71,10 +66,6 @@
       // Thử dùng require (CommonJS) - hoạt động trong Node.js
       let urlModule = null;
       if (typeof require !== 'undefined') {
-        urlModule = require('url');
-      } else if (typeof createRequire !== 'undefined') {
-        const { createRequire } = await import('module');
-        const require = createRequire(import.meta.url);
         urlModule = require('url');
       }
       
