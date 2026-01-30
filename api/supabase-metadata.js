@@ -189,16 +189,19 @@ export default async function handler(request) {
         console.log('[Supabase Metadata] Đang lưu vào Supabase...');
         const setStartTime = Date.now();
         
-        // Dùng UPSERT với ON CONFLICT để tự động insert hoặc update
-        // Supabase REST API hỗ trợ upsert với header Prefer: resolution=merge-duplicates
+        // Dùng UPSERT với header Prefer: resolution=merge-duplicates
+        // Supabase REST API tự động insert nếu chưa có, update nếu đã có
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
+        
+        const upsertUrl = `${supabaseUrl}/rest/v1/metadata`;
         const upsertHeaders = {
-          'apikey': process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY,
-          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY}`,
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates', // Upsert: merge nếu conflict
         };
         
-        const upsertUrl = `${process.env.SUPABASE_URL}/rest/v1/metadata`;
         const upsertResponse = await fetch(upsertUrl, {
           method: 'POST',
           headers: upsertHeaders,
@@ -209,11 +212,18 @@ export default async function handler(request) {
         });
         
         if (!upsertResponse.ok) {
-          // Nếu upsert fail, thử update trực tiếp
-          console.log('[Supabase Metadata] Upsert failed, thử update...');
-          await supabaseRequest('PATCH', `metadata?key=eq.${METADATA_KEY}`, {
-            value: metadata,
-          });
+          const errorText = await upsertResponse.text();
+          console.error(`[Supabase Metadata] Upsert failed: ${upsertResponse.status} - ${errorText}`);
+          
+          // Nếu insert fail (key đã tồn tại), thử update
+          if (upsertResponse.status === 409 || errorText.includes('duplicate') || errorText.includes('unique')) {
+            console.log('[Supabase Metadata] Key đã tồn tại, thử update...');
+            await supabaseRequest('PATCH', `metadata?key=eq.${METADATA_KEY}`, {
+              value: metadata,
+            });
+          } else {
+            throw new Error(`Supabase upsert failed: ${upsertResponse.status} - ${errorText}`);
+          }
         }
         
         const setDuration = Date.now() - setStartTime;
