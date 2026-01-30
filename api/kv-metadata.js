@@ -339,7 +339,7 @@ export default async function handler(request) {
       timestamp: handlerEntryTime,
     });
     
-    // Debug request object properties
+    // Debug request object properties - QUAN TRỌNG: kiểm tra bodyUsed
     console.log('[KV Metadata] Request object debug:', {
       type: typeof request,
       constructor: request?.constructor?.name,
@@ -347,11 +347,17 @@ export default async function handler(request) {
       hasJson: typeof request?.json === 'function',
       hasText: typeof request?.text === 'function',
       hasBody: !!request?.body,
+      bodyUsed: request?.bodyUsed, // QUAN TRỌNG: nếu true thì body đã bị consumed
       bodyType: typeof request?.body,
       method: request?.method,
       url: request?.url,
       headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
     });
+    
+    // CẢNH BÁO nếu body đã bị consumed
+    if (request?.bodyUsed === true) {
+      console.error('[KV Metadata] ⚠️ WARNING: Request body đã bị consumed! Không thể gọi request.json() lần nữa.');
+    }
   
   // Kiểm tra format của KV_REST_API_URL
   if (process.env.KV_REST_API_URL) {
@@ -468,22 +474,45 @@ export default async function handler(request) {
     try {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
       
-      // Đọc body từ request với timeout protection
+      // Đọc body từ request
+      // request.json() là cách đúng (Web Standard Request API)
+      // QUAN TRỌNG: Request body chỉ có thể đọc 1 lần (bodyUsed property)
       console.log('[KV Metadata] Reading request body...');
+      console.log('[KV Metadata] Body used before parsing:', request?.bodyUsed);
+      
       let data;
       try {
-        // Wrap trong Promise.race để có timeout
+        // Kiểm tra nếu body đã bị consumed
+        if (request?.bodyUsed === true) {
+          console.error('[KV Metadata] ⚠️ Request body đã bị consumed! Có thể có middleware đã đọc trước.');
+          throw new Error('Request body đã bị consumed trước đó');
+        }
+        
+        // request.json() là cách đúng - giống save-metadata.js và các API khác
+        // Wrap trong Promise.race để có timeout protection (3s)
         const jsonPromise = request.json();
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
         );
         data = await Promise.race([jsonPromise, timeoutPromise]);
         console.log('[KV Metadata] Request body parsed successfully');
+        console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
       } catch (parseError) {
+        // Log chi tiết để debug
         console.error('[KV Metadata] ❌ Error parsing request body:', {
           error: parseError.message,
           name: parseError.name,
+          cause: parseError.cause, // undefined nếu là client abort
+          bodyUsed: request?.bodyUsed,
+          isAbortError: parseError.name === 'AbortError',
+          stack: parseError.stack?.split('\n').slice(0, 5).join('\n'),
         });
+        
+        // Nếu là AbortError từ client, không phải lỗi server
+        if (parseError.name === 'AbortError') {
+          throw new Error(`Client đã abort request: ${parseError.message}`);
+        }
+        
         throw new Error(`Không thể đọc request body: ${parseError.message}`);
       }
       
