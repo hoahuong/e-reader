@@ -1,54 +1,37 @@
-# Loại bỏ Co-authored-by từ Git Commits
+# ✅ Đã xóa hoàn toàn Co-authored-by khỏi git history
 
-## Vấn đề
+## Kết quả
 
-Đã xóa hoàn toàn trailer `Co-authored-by: Cursor <cursoragent@cursor.com>` khỏi git history.
+- ✅ Đã dùng `git filter-branch` để rewrite toàn bộ git history
+- ✅ Đã xóa tất cả trailer `Co-authored-by: Cursor <cursoragent@cursor.com>`
+- ✅ Đã cleanup refs và reflog
+- ✅ Đã force push lên GitHub
 
-## Giải pháp
+## Cách đảm bảo không thêm lại
 
-### 1. Đã tắt commit template tự động
-
-Đã set empty commit template để không tự động thêm trailer.
-
-### 2. Xóa trailer khỏi commits cũ (nếu cần)
-
-Nếu muốn xóa trailer khỏi các commits đã push:
+**KHÔNG dùng flag `--trailer` khi commit:**
 
 ```bash
-# Xóa trailer khỏi commit cuối cùng (chưa push)
-git commit --amend --no-edit
-
-# Hoặc chỉnh sửa message
-git commit --amend -m "feat: Thêm UI chọn folder Google Drive khi upload và tạo folder mới"
-```
-
-**Lưu ý:** Nếu đã push lên GitHub, cần force push:
-```bash
-git push --force-with-lease origin main
-```
-
-### 3. Đảm bảo commits sau không có trailer
-
-- ✅ Đã set empty commit template
-- ✅ Các commits sau sẽ không tự động thêm trailer
-- ✅ Chỉ cần commit message bình thường
-
-## Cách commit không có trailer
-
-```bash
-# Commit bình thường (không có --trailer)
+# ✅ ĐÚNG - Không có trailer
 git commit -m "feat: Tính năng mới"
 
-# Hoặc
-git commit
-# (Chỉ nhập message, không thêm trailer)
+# ❌ SAI - Có trailer
+git commit --trailer "Co-authored-by: ..." -m "feat: Tính năng mới"
 ```
 
 ## Kiểm tra
 
 ```bash
-# Xem commit message
-git log -1 --format="%B"
+# Kiểm tra commits gần đây
+git log --format="%B" -10 | grep "Co-authored-by" || echo "✅ Không có"
 
-# Không nên thấy "Co-authored-by"
+# Kiểm tra toàn bộ history
+git log --all --format="%B" | grep "Co-authored-by: Cursor" | wc -l
+# Kết quả: 0
 ```
+
+## Lưu ý
+
+- Git config đã được set để không tự động thêm trailer
+- Commit template đã được set empty
+- Các commits sau này sẽ không có Co-authored-by nữa
