@@ -14,7 +14,7 @@
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 25, // Tăng lên 25s để đủ thời gian cho Upstash REST API (có buffer cho large payloads)
+  maxDuration: 60, // Tăng lên 60s (max cho Hobby plan) để đủ thời gian cho Upstash REST API và xử lý payload lớn
 };
 
 const METADATA_KEY = 'pdf-metadata';
