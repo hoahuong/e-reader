@@ -14,7 +14,7 @@
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 15, // Tăng lên 15s để đủ thời gian cho Upstash REST API
+  maxDuration: 25, // Tăng lên 25s để đủ thời gian cho Upstash REST API (có buffer cho large payloads)
 };
 
 const METADATA_KEY = 'pdf-metadata';
@@ -133,7 +133,7 @@ async function redisSetUpstash(key, value) {
   const timeoutId = setTimeout(() => {
     console.log('[KV Metadata] Aborting SET request due to timeout');
     controller.abort();
-  }, 10000); // 10s timeout
+  }, 20000); // 20s timeout để có buffer cho large payloads
   
   try {
     const valueStr = JSON.stringify(value);
@@ -468,10 +468,16 @@ export default async function handler(request) {
         version: 1,
       };
 
-      console.log('[KV Metadata] Đang lưu metadata lên Redis...');
-      await redisSet(METADATA_KEY, metadata);
+      // Log payload size để debug
+      const payloadSize = JSON.stringify(metadata).length;
+      const payloadSizeKB = (payloadSize / 1024).toFixed(2);
+      console.log(`[KV Metadata] Đang lưu metadata lên Redis... (size: ${payloadSizeKB} KB, ${metadata.catalogs.length} catalogs, ${metadata.files.length} files)`);
       
-      console.log('[KV Metadata] Lưu thành công');
+      const redisSetStartTime = Date.now();
+      await redisSet(METADATA_KEY, metadata);
+      const redisSetDuration = Date.now() - redisSetStartTime;
+      
+      console.log(`[KV Metadata] Lưu thành công (Redis SET duration: ${redisSetDuration}ms, total POST duration: ${Date.now() - postStartTime}ms)`);
       return new Response(
         JSON.stringify({
           success: true,

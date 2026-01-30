@@ -112,7 +112,7 @@ export async function saveMetadataToCloud(catalogs, files) {
     console.log(`[Metadata Sync KV] Đang lưu metadata lên Vercel KV: ${payload.catalogs.length} catalogs, ${payload.files.length} files`);
     
     const controller = new AbortController();
-    const timeoutMs = 15000; // 15s timeout cho save operation
+    const timeoutMs = 25000; // 25s timeout cho save operation (match với maxDuration của API)
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     try {
