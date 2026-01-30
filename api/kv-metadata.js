@@ -14,7 +14,7 @@
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 10, // Redis rất nhanh, chỉ cần 10s
+  maxDuration: 15, // Tăng lên 15s để đủ thời gian cho Upstash REST API
 };
 
 const METADATA_KEY = 'pdf-metadata';
@@ -103,26 +103,53 @@ async function redisGetUpstash(key) {
 }
 
 async function redisSetUpstash(key, value) {
-  // Upstash REST API: SET command cần value trong URL path, không phải body
-  // Format: /set/{key}/{value}
-  // Value cần được encode để tránh special characters
-  const valueStr = JSON.stringify(value);
-  const encodedValue = encodeURIComponent(valueStr);
-  
-  const response = await fetch(`${process.env.KV_REST_API_URL}/set/${key}/${encodedValue}`, {
-    method: 'GET', // Upstash REST API dùng GET cho SET command
-    headers: {
-      'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-    },
-  });
+  try {
+    // Upstash REST API: SET command cần value trong URL path, không phải body
+    // Format: /set/{key}/{value}
+    // Value cần được encode để tránh special characters
+    const valueStr = JSON.stringify(value);
+    const encodedValue = encodeURIComponent(valueStr);
+    
+    // Kiểm tra độ dài URL - Upstash có giới hạn URL length
+    const url = `${process.env.KV_REST_API_URL}/set/${key}/${encodedValue}`;
+    if (url.length > 8000) {
+      // Nếu URL quá dài, có thể dùng POST với body (nếu Upstash hỗ trợ)
+      // Hoặc chia nhỏ payload
+      console.warn('[KV Metadata] Payload quá lớn, có thể gây timeout');
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET', // Upstash REST API dùng GET cho SET command
+      headers: {
+        'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+      },
+      // Add timeout để tránh hang
+      signal: AbortSignal.timeout(8000), // 8s timeout
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Redis SET failed: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Redis SET failed: ${response.status} - ${errorText}`);
+    }
+
+    // Check content-type
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[KV Metadata] SET response không phải JSON:', text.substring(0, 200));
+      throw new Error('Invalid response format from Redis SET API');
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('[KV Metadata] Redis SET error:', error);
+    // Handle timeout và network errors
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      throw new Error('Redis SET request timeout - có thể do network hoặc payload quá lớn');
+    }
+    throw error;
   }
-
-  const result = await response.json();
-  return result;
 }
 
 /**

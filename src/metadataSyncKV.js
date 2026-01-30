@@ -111,7 +111,7 @@ export async function saveMetadataToCloud(catalogs, files) {
     console.log(`[Metadata Sync KV] Đang lưu metadata lên Vercel KV: ${payload.catalogs.length} catalogs, ${payload.files.length} files`);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Tăng lên 15s để đủ thời gian cho Upstash
     
     try {
       const response = await fetch('/api/kv-metadata', {
@@ -133,19 +133,33 @@ export async function saveMetadataToCloud(catalogs, files) {
           errorData = { error: errorText || `HTTP ${response.status}` };
         }
         
-        // Handle 500 errors (thường do thiếu env vars)
+        // Handle 500 errors (thường do thiếu env vars hoặc timeout)
         if (response.status === 500) {
           if (errorData.error?.includes('Upstash Redis chưa được setup') || 
               errorData.error?.includes('KV_REST_API_URL') ||
               errorData.error?.includes('KV_REST_API_TOKEN')) {
             console.warn('[Metadata Sync KV] Redis chưa được setup, không thể lưu metadata lên cloud');
             console.warn('[Metadata Sync KV] Metadata sẽ chỉ lưu local (IndexedDB)');
-            throw new Error('Redis chưa được setup - chỉ lưu local');
+            // Không throw error, chỉ log warning và return null để fallback về local
+            return null;
+          }
+          
+          // Handle timeout errors từ server
+          if (errorData.error?.includes('timeout') || errorData.details?.includes('timeout')) {
+            console.warn('[Metadata Sync KV] Server timeout khi lưu metadata, sẽ lưu local thay thế');
+            return null; // Fallback về local storage
           }
         }
         
+        // Handle 503 (Service Unavailable)
+        if (response.status === 503) {
+          console.warn('[Metadata Sync KV] Redis không khả dụng, sẽ lưu local thay thế');
+          return null; // Fallback về local storage
+        }
+        
         console.error(`[Metadata Sync KV] API trả về lỗi ${response.status}:`, errorData);
-        throw new Error(errorData.error || errorData.details || 'Không thể lưu metadata');
+        // Không throw error, chỉ log và return null để không block UI
+        return null;
       }
 
       const result = await response.json();
@@ -154,13 +168,26 @@ export async function saveMetadataToCloud(catalogs, files) {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.error('[Metadata Sync KV] Request timeout sau 10s');
-        throw new Error('Request timeout - Không thể lưu metadata lên Vercel KV');
+        console.warn('[Metadata Sync KV] Request timeout sau 15s, sẽ lưu local thay thế');
+        // Không throw error, chỉ log warning và return null để fallback về local
+        return null;
       }
-      throw fetchError;
+      
+      // Handle network errors
+      if (fetchError.message?.includes('Failed to fetch') || 
+          fetchError.message?.includes('NetworkError') ||
+          fetchError.message?.includes('timeout')) {
+        console.warn('[Metadata Sync KV] Network error khi lưu metadata, sẽ lưu local thay thế:', fetchError.message);
+        return null; // Fallback về local storage
+      }
+      
+      // Log error nhưng không throw để không block UI
+      console.error('[Metadata Sync KV] Lỗi khi lưu metadata:', fetchError);
+      return null;
     }
   } catch (error) {
     console.error('[Metadata Sync KV] Lỗi khi lưu metadata:', error);
+    // Không throw error, chỉ return null để fallback về local storage
     return null;
   }
 }
