@@ -4,29 +4,44 @@
  * 
  * Lỗi "Cannot read properties of undefined (reading 'get')" xảy ra vì
  * webidl-conversions cần URL và URLSearchParams globals trước khi jsdom load
+ * 
+ * IMPORTANT: File này phải được load TRƯỚC khi jsdom environment được initialize
  */
 
 // Polyfill URL và URLSearchParams cho Node.js environment
 // Phải được execute synchronously, không dùng async/await
 (function setupPolyfills() {
-  if (typeof globalThis === 'undefined') return;
+  // Set globals cho cả globalThis và global
+  const globals = typeof globalThis !== 'undefined' ? globalThis : (typeof global !== 'undefined' ? global : {});
   
   // Polyfill cho URL - sử dụng Node.js built-in nếu có
-  if (!globalThis.URL) {
+  if (!globals.URL) {
     try {
       // Thử dùng require (CommonJS) - hoạt động trong Node.js
-      const urlModule = typeof require !== 'undefined' ? require('url') : null;
+      // Sử dụng createRequire để tương thích với ESM
+      let urlModule = null;
+      if (typeof require !== 'undefined') {
+        urlModule = require('url');
+      } else if (typeof createRequire !== 'undefined') {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        urlModule = require('url');
+      }
+      
       if (urlModule && urlModule.URL) {
-        globalThis.URL = urlModule.URL;
-        if (typeof global !== 'undefined') {
+        globals.URL = urlModule.URL;
+        if (typeof global !== 'undefined' && global !== globals) {
           global.URL = urlModule.URL;
         }
+        if (typeof globalThis !== 'undefined' && globalThis !== globals) {
+          globalThis.URL = urlModule.URL;
+        }
       } else {
-        throw new Error('require not available');
+        throw new Error('URL module not available');
       }
     } catch (e) {
       // Fallback: tạo mock URL class
-      globalThis.URL = class URL {
+      const MockURL = class URL {
         constructor(url, base) {
           this.href = String(url);
           this.origin = '';
@@ -40,28 +55,43 @@
         }
         toString() { return this.href; }
       };
-      if (typeof global !== 'undefined') {
-        global.URL = globalThis.URL;
+      globals.URL = MockURL;
+      if (typeof global !== 'undefined' && global !== globals) {
+        global.URL = MockURL;
+      }
+      if (typeof globalThis !== 'undefined' && globalThis !== globals) {
+        globalThis.URL = MockURL;
       }
     }
   }
   
   // Polyfill cho URLSearchParams
-  if (!globalThis.URLSearchParams) {
+  if (!globals.URLSearchParams) {
     try {
       // Thử dùng require (CommonJS) - hoạt động trong Node.js
-      const urlModule = typeof require !== 'undefined' ? require('url') : null;
+      let urlModule = null;
+      if (typeof require !== 'undefined') {
+        urlModule = require('url');
+      } else if (typeof createRequire !== 'undefined') {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        urlModule = require('url');
+      }
+      
       if (urlModule && urlModule.URLSearchParams) {
-        globalThis.URLSearchParams = urlModule.URLSearchParams;
-        if (typeof global !== 'undefined') {
+        globals.URLSearchParams = urlModule.URLSearchParams;
+        if (typeof global !== 'undefined' && global !== globals) {
           global.URLSearchParams = urlModule.URLSearchParams;
         }
+        if (typeof globalThis !== 'undefined' && globalThis !== globals) {
+          globalThis.URLSearchParams = urlModule.URLSearchParams;
+        }
       } else {
-        throw new Error('require not available');
+        throw new Error('URLSearchParams module not available');
       }
     } catch (e) {
       // Fallback: tạo mock URLSearchParams class
-      globalThis.URLSearchParams = class URLSearchParams {
+      const MockURLSearchParams = class URLSearchParams {
         constructor(init) {
           this.params = new Map();
           if (init) {
@@ -86,8 +116,12 @@
             .join('&');
         }
       };
-      if (typeof global !== 'undefined') {
-        global.URLSearchParams = globalThis.URLSearchParams;
+      globals.URLSearchParams = MockURLSearchParams;
+      if (typeof global !== 'undefined' && global !== globals) {
+        global.URLSearchParams = MockURLSearchParams;
+      }
+      if (typeof globalThis !== 'undefined' && globalThis !== globals) {
+        globalThis.URLSearchParams = MockURLSearchParams;
       }
     }
   }
