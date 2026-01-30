@@ -45,8 +45,12 @@ async function redisGetUpstash(key) {
   try {
     // Upstash REST API: GET command format
     // https://{region}-{database-name}-{id}.upstash.io/get/{key}
-    console.log(`[KV Metadata] GET request to: ${process.env.KV_REST_API_URL}/get/${key}`);
-    const response = await fetch(`${process.env.KV_REST_API_URL}/get/${key}`, {
+    const url = `${process.env.KV_REST_API_URL}/get/${key}`;
+    console.log(`[KV Metadata] GET request to: ${url.substring(0, 50)}...`);
+    console.log(`[KV Metadata] Token present: ${!!process.env.KV_REST_API_TOKEN}`);
+    
+    const startTime = Date.now();
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
@@ -55,7 +59,8 @@ async function redisGetUpstash(key) {
       signal: AbortSignal.timeout(10000), // 10s timeout để match với client
     });
     
-    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}`);
+    const duration = Date.now() - startTime;
+    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
     if (!response.ok) {
       if (response.status === 404) {
