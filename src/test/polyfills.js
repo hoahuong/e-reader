@@ -7,18 +7,22 @@
  */
 
 // Polyfill URL và URLSearchParams cho Node.js environment
-// Sử dụng Node.js built-in URL nếu có, nếu không thì tạo mock
-if (typeof globalThis !== 'undefined') {
-  // Polyfill cho URL
+// Phải được execute synchronously, không dùng async/await
+(function setupPolyfills() {
+  if (typeof globalThis === 'undefined') return;
+  
+  // Polyfill cho URL - sử dụng Node.js built-in nếu có
   if (!globalThis.URL) {
     try {
-      // Thử import từ Node.js url module (ESM)
-      const urlModule = await import('url');
-      if (urlModule.URL) {
+      // Thử dùng require (CommonJS) - hoạt động trong Node.js
+      const urlModule = typeof require !== 'undefined' ? require('url') : null;
+      if (urlModule && urlModule.URL) {
         globalThis.URL = urlModule.URL;
         if (typeof global !== 'undefined') {
           global.URL = urlModule.URL;
         }
+      } else {
+        throw new Error('require not available');
       }
     } catch (e) {
       // Fallback: tạo mock URL class
@@ -45,13 +49,15 @@ if (typeof globalThis !== 'undefined') {
   // Polyfill cho URLSearchParams
   if (!globalThis.URLSearchParams) {
     try {
-      // Thử import từ Node.js url module (ESM)
-      const urlModule = await import('url');
-      if (urlModule.URLSearchParams) {
+      // Thử dùng require (CommonJS) - hoạt động trong Node.js
+      const urlModule = typeof require !== 'undefined' ? require('url') : null;
+      if (urlModule && urlModule.URLSearchParams) {
         globalThis.URLSearchParams = urlModule.URLSearchParams;
         if (typeof global !== 'undefined') {
           global.URLSearchParams = urlModule.URLSearchParams;
         }
+      } else {
+        throw new Error('require not available');
       }
     } catch (e) {
       // Fallback: tạo mock URLSearchParams class
@@ -85,7 +91,7 @@ if (typeof globalThis !== 'undefined') {
       }
     }
   }
-}
+})();
 
 // Export để có thể import trong setup.js
 export {};
