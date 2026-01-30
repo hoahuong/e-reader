@@ -666,17 +666,15 @@ export default async function handler(request) {
             });
             throw jsonError;
           }
-        } else {
-          console.log(`[KV Metadata] ⚠️ request.json is NOT a function (type: ${typeof jsonMethod}), will try fallback methods...`);
         }
         // CÁCH 2: Thử dùng request.body nếu là object (Vercel Node.js helper)
-        else if (request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
+        if (!data && request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
           console.log('[KV Metadata] ✅ Using request.body (Vercel Node.js helper)...');
           data = request.body;
           console.log('[KV Metadata] ✅ Request body parsed successfully via request.body');
         }
         // CÁCH 3: Thử đọc từ body stream hoặc string
-        else if (request?.body) {
+        if (!data && request?.body) {
           console.log('[KV Metadata] ✅ Reading from request.body...');
           if (typeof request.body === 'string') {
             console.log('[KV Metadata] Body is string, parsing JSON...');
@@ -704,7 +702,7 @@ export default async function handler(request) {
           }
         }
         // CÁCH 4: Thử wrap trong Request object mới
-        else {
+        if (!data) {
           console.log('[KV Metadata] ✅ Trying to create new Request object...');
           try {
             const newRequest = new Request(request.url || 'http://localhost', {
