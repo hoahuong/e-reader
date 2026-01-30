@@ -1,570 +1,90 @@
 /**
- * API route để lưu/đọc metadata từ Redis
+ * API route để lưu/đọc metadata từ Vercel KV (Upstash Redis)
  * GET /api/kv-metadata - Đọc metadata
  * POST /api/kv-metadata - Lưu metadata
  * 
- * Hỗ trợ 2 loại Redis:
- * 1. Upstash Redis (qua Vercel Marketplace) - Dùng REST API
- *    - KV_REST_API_URL (Upstash REST API URL)
- *    - KV_REST_API_TOKEN (Upstash REST API Token)
- * 
- * 2. Redis Labs hoặc Redis khác - Dùng Redis Client
- *    - REDIS_URL (Redis connection string, ví dụ: redis://...)
+ * Sử dụng @vercel/kv SDK - Đơn giản và đáng tin cậy hơn REST API
  */
+
+import { kv } from '@vercel/kv';
 
 export const config = {
   runtime: 'nodejs',
-  maxDuration: 60, // Tăng lên 60s (max cho Hobby plan) để đủ thời gian cho Upstash REST API và xử lý payload lớn
+  maxDuration: 60, // 60s (max cho Hobby plan)
 };
 
 const METADATA_KEY = 'pdf-metadata';
 
-// Lazy load Redis client (chỉ load khi cần)
-let redisClient = null;
-
-async function getRedisClient() {
-  if (redisClient) {
-    return redisClient;
-  }
-
-  // Nếu có REDIS_URL, dùng Redis client (Redis Labs hoặc Redis khác)
-  if (process.env.REDIS_URL) {
-    const { createClient } = await import('redis');
-    redisClient = createClient({ url: process.env.REDIS_URL });
-    await redisClient.connect();
-    return redisClient;
-  }
-
-  return null;
-}
-
-/**
- * Helper function để gọi Upstash Redis REST API
- */
-async function redisGetUpstash(key) {
-  const getStartTime = Date.now();
-  console.log(`[KV Metadata] 🔵 redisGetUpstash START - key: ${key}, time: ${new Date().toISOString()}`);
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    const elapsed = Date.now() - getStartTime;
-    console.error(`[KV Metadata] ⚠️ GET request TIMEOUT sau ${elapsed}ms - aborting...`);
-    controller.abort();
-  }, 10000); // 10s timeout
-  
-  try {
-    // Upstash REST API: GET command format
-    // https://{region}-{database-name}-{id}.upstash.io/get/{key}
-    const url = `${process.env.KV_REST_API_URL}/get/${key}`;
-    console.log(`[KV Metadata] GET request to: ${url.substring(0, 50)}...`);
-    console.log(`[KV Metadata] Token present: ${!!process.env.KV_REST_API_TOKEN}`);
-    
-    const fetchStartTime = Date.now();
-    console.log(`[KV Metadata] 🔵 About to call fetch()...`);
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-        },
-        signal: controller.signal,
-      });
-      const fetchDuration = Date.now() - fetchStartTime;
-      console.log(`[KV Metadata] ✅ Fetch completed in ${fetchDuration}ms`);
-    } catch (fetchError) {
-      const fetchDuration = Date.now() - fetchStartTime;
-      console.error(`[KV Metadata] ❌ Fetch failed after ${fetchDuration}ms:`, {
-        error: fetchError.message,
-        name: fetchError.name,
-        cause: fetchError.cause,
-      });
-      throw fetchError;
-    }
-    
-    // Cleanup timeout ngay khi có response
-    clearTimeout(timeoutId);
-    const duration = Date.now() - getStartTime;
-    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, total duration: ${duration}ms`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log(`[KV Metadata] 🔵 404 - About to consume body...`);
-        const consumeStart = Date.now();
-        await response.text().catch((e) => {
-          console.error(`[KV Metadata] Error consuming 404 body:`, e.message);
-          return null;
-        });
-        console.log(`[KV Metadata] ✅ Body consumed in ${Date.now() - consumeStart}ms`);
-        return null;
-      }
-      console.log(`[KV Metadata] 🔵 Error response - About to read error text...`);
-      const errorTextStart = Date.now();
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.log(`[KV Metadata] ✅ Error text read in ${Date.now() - errorTextStart}ms`);
-      throw new Error(`Redis GET failed: ${response.status} - ${errorText}`);
-    }
-
-    // Check content-type
-    const contentType = response.headers.get('content-type') || '';
-    console.log(`[KV Metadata] Content-Type: ${contentType}`);
-    if (!contentType.includes('application/json')) {
-      console.log(`[KV Metadata] 🔵 Non-JSON response - About to read text...`);
-      const textStart = Date.now();
-      const text = await response.text();
-      console.log(`[KV Metadata] ✅ Text read in ${Date.now() - textStart}ms`);
-      console.error('[KV Metadata] Response không phải JSON:', text.substring(0, 200));
-      throw new Error('Invalid response format from Redis API');
-    }
-
-    console.log(`[KV Metadata] 🔵 About to parse JSON...`);
-    const jsonStart = Date.now();
-    const data = await response.json();
-    console.log(`[KV Metadata] ✅ JSON parsed in ${Date.now() - jsonStart}ms`);
-    
-    // Handle different Upstash response formats
-    if (data && typeof data === 'object') {
-      if (data.result !== undefined) {
-        // Upstash returns { result: "stringified JSON" } or { result: object }
-        try {
-          if (typeof data.result === 'string') {
-            return JSON.parse(data.result);
-          } else if (typeof data.result === 'object') {
-            return data.result;
-          }
-        } catch (parseError) {
-          console.error('[KV Metadata] Error parsing Redis result:', parseError);
-          return null;
-        }
-      }
-      // Direct object response
-      return data;
-    }
-    
-    const totalDuration = Date.now() - getStartTime;
-    console.log(`[KV Metadata] ✅ redisGetUpstash COMPLETE in ${totalDuration}ms`);
-    return null;
-  } catch (error) {
-    // Đảm bảo cleanup timeout trong catch
-    clearTimeout(timeoutId);
-    const totalDuration = Date.now() - getStartTime;
-    console.error(`[KV Metadata] ❌ redisGetUpstash ERROR after ${totalDuration}ms:`, {
-      error: error.message,
-      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
-      name: error.name,
-      cause: error.cause,
-      url: `${process.env.KV_REST_API_URL}/get/${key}`,
-      hasToken: !!process.env.KV_REST_API_TOKEN,
-    });
-    // Handle timeout và network errors
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error(`Redis GET request timeout sau ${totalDuration}ms - có thể do network hoặc Redis không khả dụng`);
-    }
-    throw error;
-  }
-}
-
-async function redisSetUpstash(key, value) {
-  const setStartTime = Date.now();
-  console.log(`[KV Metadata] 🟢 redisSetUpstash START - key: ${key}, time: ${new Date().toISOString()}`);
-  
-  // Kiểm tra env vars trước
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-    throw new Error('KV_REST_API_URL hoặc KV_REST_API_TOKEN chưa được set');
-  }
-  
-  // Kiểm tra URL format
-  const baseUrl = process.env.KV_REST_API_URL;
-  if (!baseUrl.startsWith('https://')) {
-    throw new Error(`KV_REST_API_URL không hợp lệ (phải bắt đầu bằng https://): ${baseUrl}`);
-  }
-  if (baseUrl.includes('/get/') || baseUrl.includes('/set/')) {
-    throw new Error(`KV_REST_API_URL không nên chứa /get/ hoặc /set/: ${baseUrl}`);
-  }
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    const elapsed = Date.now() - setStartTime;
-    console.error(`[KV Metadata] ⚠️ SET request TIMEOUT sau ${elapsed}ms - aborting...`);
-    controller.abort();
-  }, 5000); // Giảm xuống 5s để phát hiện sớm connection issues
-  
-  try {
-    const stringifyStart = Date.now();
-    const valueStr = JSON.stringify(value);
-    const stringifyDuration = Date.now() - stringifyStart;
-    console.log(`[KV Metadata] JSON.stringify took ${stringifyDuration}ms`);
-    
-    const valueSize = new Blob([valueStr]).size;
-    console.log(`[KV Metadata] SET request - key: ${key}, value size: ${valueSize} bytes (${(valueSize/1024).toFixed(2)} KB)`);
-    
-    const url = `${baseUrl}/set/${key}`;
-    console.log(`[KV Metadata] SET URL: ${url}`);
-    console.log(`[KV Metadata] Token length: ${process.env.KV_REST_API_TOKEN?.length || 0} chars`);
-    
-    // Log request details
-    const requestDetails = {
-      url: url,
-      method: 'POST',
-      hasBody: !!valueStr,
-      bodySize: valueSize,
-      hasToken: !!process.env.KV_REST_API_TOKEN,
-      tokenPrefix: process.env.KV_REST_API_TOKEN?.substring(0, 10) || 'none',
-    };
-    console.log('[KV Metadata] Request details:', requestDetails);
-    
-    const fetchStartTime = Date.now();
-    console.log(`[KV Metadata] 🟢 About to call fetch()...`);
-    
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-          'Content-Type': 'text/plain',
-        },
-        body: valueStr,
-        signal: controller.signal,
-      });
-      const fetchDuration = Date.now() - fetchStartTime;
-      console.log(`[KV Metadata] ✅ Fetch completed in ${fetchDuration}ms`);
-    } catch (fetchError) {
-      const fetchDuration = Date.now() - fetchStartTime;
-      console.error(`[KV Metadata] ❌ Fetch failed after ${fetchDuration}ms:`, {
-        error: fetchError.message,
-        name: fetchError.name,
-        cause: fetchError.cause,
-      });
-      throw fetchError;
-    }
-    
-    // Cleanup timeout ngay khi có response
-    clearTimeout(timeoutId);
-    const duration = Date.now() - setStartTime;
-    console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, total duration: ${duration}ms`);
-    
-    // Log response headers để debug
-    console.log('[KV Metadata] Response headers:', {
-      contentType: response.headers.get('content-type'),
-      contentLength: response.headers.get('content-length'),
-      status: response.status,
-      statusText: response.statusText,
-    });
-
-    if (!response.ok) {
-      console.log(`[KV Metadata] 🟢 Error response - About to read error text...`);
-      const errorTextStart = Date.now();
-      const errorText = await response.text().catch((e) => {
-        console.error(`[KV Metadata] Error reading error text:`, e.message);
-        return 'Unknown error';
-      });
-      console.log(`[KV Metadata] ✅ Error text read in ${Date.now() - errorTextStart}ms`);
-      console.error(`[KV Metadata] ❌ Redis SET failed: ${response.status} - ${errorText.substring(0, 500)}`);
-      
-      // Log chi tiết về error response
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(`Authentication failed (${response.status}): Token có thể không đúng hoặc hết hạn`);
-      } else if (response.status === 400) {
-        throw new Error(`Bad request (400): ${errorText.substring(0, 200)}`);
-      } else if (response.status >= 500) {
-        throw new Error(`Upstash server error (${response.status}): ${errorText.substring(0, 200)}`);
-      }
-      
-      throw new Error(`Redis SET failed: ${response.status} - ${errorText.substring(0, 200)}`);
-    }
-
-    // Check content-type
-    const contentType = response.headers.get('content-type') || '';
-    console.log(`[KV Metadata] Response content-type: ${contentType}`);
-    
-    if (!contentType.includes('application/json')) {
-      console.log(`[KV Metadata] 🟢 Non-JSON response - About to read text...`);
-      const textStart = Date.now();
-      const text = await response.text();
-      console.log(`[KV Metadata] ✅ Text read in ${Date.now() - textStart}ms`);
-      console.error('[KV Metadata] ⚠️ Response không phải JSON:', text.substring(0, 500));
-      throw new Error(`Invalid response format from Redis SET API: ${contentType} - ${text.substring(0, 100)}`);
-    }
-
-    console.log(`[KV Metadata] 🟢 About to parse JSON...`);
-    const jsonStart = Date.now();
-    const result = await response.json();
-    console.log(`[KV Metadata] ✅ JSON parsed in ${Date.now() - jsonStart}ms`);
-    const totalDuration = Date.now() - setStartTime;
-    console.log(`[KV Metadata] ✅ redisSetUpstash COMPLETE in ${totalDuration}ms`);
-    console.log(`[KV Metadata] ✅ SET thành công:`, result);
-    return result;
-  } catch (error) {
-    // Đảm bảo cleanup timeout trong catch
-    clearTimeout(timeoutId);
-    const totalDuration = Date.now() - setStartTime;
-    
-    // Phân loại error để debug dễ hơn
-    const errorInfo = {
-      error: error.message,
-      name: error.name,
-      cause: error.cause,
-      url: `${process.env.KV_REST_API_URL}/set/${key}`,
-      hasToken: !!process.env.KV_REST_API_TOKEN,
-      tokenLength: process.env.KV_REST_API_TOKEN?.length || 0,
-      valueSize: valueSize,
-      valueSizeKB: (valueSize / 1024).toFixed(2),
-      duration: totalDuration,
-    };
-    
-    console.error(`[KV Metadata] ❌ redisSetUpstash ERROR after ${totalDuration}ms:`, errorInfo);
-    console.error(`[KV Metadata] Error stack:`, error.stack?.split('\n').slice(0, 5).join('\n'));
-    
-    // Handle timeout và network errors với message rõ ràng hơn
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error(`Redis SET request timeout sau ${totalDuration}ms - Kiểm tra: 1) Connection đến Upstash, 2) Token có đúng không, 3) URL format có đúng không`);
-    }
-    
-    // Handle network errors
-    if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
-      throw new Error(`Không thể kết nối đến Upstash Redis: ${error.message}. Kiểm tra KV_REST_API_URL có đúng không.`);
-    }
-    
-    throw error;
-  }
-}
-
-/**
- * Unified Redis GET - Auto-detect Redis type
- */
-async function redisGet(key) {
-  // Nếu có REDIS_URL, dùng Redis client
-  if (process.env.REDIS_URL) {
-    try {
-      const client = await getRedisClient();
-      const value = await client.get(key);
-      if (!value) return null;
-      return JSON.parse(value);
-    } catch (error) {
-      console.error('[KV Metadata] Redis client GET error:', error);
-      throw error;
-    }
-  }
-
-  // Nếu có Upstash REST API credentials, dùng REST API
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    return await redisGetUpstash(key);
-  }
-
-  throw new Error('No Redis configuration found. Need either REDIS_URL or KV_REST_API_URL + KV_REST_API_TOKEN');
-}
-
-/**
- * Unified Redis SET - Auto-detect Redis type
- */
-async function redisSet(key, value) {
-  // Nếu có REDIS_URL, dùng Redis client
-  if (process.env.REDIS_URL) {
-    try {
-      const client = await getRedisClient();
-      await client.set(key, JSON.stringify(value));
-      return { success: true };
-    } catch (error) {
-      console.error('[KV Metadata] Redis client SET error:', error);
-      throw error;
-    }
-  }
-
-  // Nếu có Upstash REST API credentials, dùng REST API
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    return await redisSetUpstash(key, value);
-  }
-
-  throw new Error('No Redis configuration found. Need either REDIS_URL or KV_REST_API_URL + KV_REST_API_TOKEN');
-}
-
 export default async function handler(request) {
-  // Log ngay đầu function để verify function được gọi
   console.log('[KV Metadata] ========== HANDLER START ==========');
   console.log('[KV Metadata] Handler entry time:', new Date().toISOString());
   console.log('[KV Metadata] Request method:', request?.method);
-  console.log('[KV Metadata] Request URL:', request?.url);
   
   const handlerEntryTime = Date.now();
   
-  // Early return nếu không phải GET hoặc POST
-  if (request?.method !== 'GET' && request?.method !== 'POST') {
-    console.log('[KV Metadata] Method not allowed:', request?.method);
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-  
   try {
-    // Kiểm tra Redis đã được setup chưa
-    const hasRedisUrl = !!process.env.REDIS_URL;
-    const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+    // Kiểm tra KV đã được setup chưa
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      console.error('[KV Metadata] KV chưa được setup');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Vercel KV chưa được setup',
+          details: 'Cần tạo Upstash Redis trong Vercel Dashboard → Storage → Create Database',
+        }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Debug logging chi tiết để điều tra
-    console.log('[KV Metadata] Handler called:', {
-      method: request.method,
-      hasRedisUrl,
-      hasUpstash,
-      kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
-      kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
-      timestamp: handlerEntryTime,
-    });
-    
-    // Debug request object properties - QUAN TRỌNG: kiểm tra chi tiết request object
-    const requestDebug = {
-      type: typeof request,
-      isNull: request === null,
-      isUndefined: request === undefined,
-      constructor: request?.constructor?.name,
-      prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
-      isRequest: request instanceof Request,
-      hasJson: typeof request?.json === 'function',
-      jsonType: typeof request?.json,
-      jsonValue: request?.json,
-      hasText: typeof request?.text === 'function',
-      textType: typeof request?.text,
-      hasBody: !!request?.body,
-      bodyUsed: request?.bodyUsed,
-      bodyType: typeof request?.body,
-      bodyIsStream: request?.body instanceof ReadableStream,
-      method: request?.method,
-      url: request?.url,
-      headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
-      // Log tất cả keys của request object
-      keys: Object.keys(request || {}).slice(0, 30),
-      // Log tất cả properties
-      ownProperties: Object.getOwnPropertyNames(request || {}).slice(0, 30),
-      // Log prototype chain
-      prototypeChain: [],
-    };
-    
-    // Build prototype chain
-    let proto = Object.getPrototypeOf(request);
-    let depth = 0;
-    while (proto && depth < 5) {
-      requestDebug.prototypeChain.push({
-        name: proto.constructor?.name || 'Unknown',
-        hasJson: typeof proto.json === 'function',
-        keys: Object.keys(proto).slice(0, 10),
-      });
-      proto = Object.getPrototypeOf(proto);
-      depth++;
-    }
-    
-    console.log('[KV Metadata] 🔍 DETAILED Request object debug:', JSON.stringify(requestDebug, null, 2));
-    
-    // CẢNH BÁO nếu body đã bị consumed
-    if (request?.bodyUsed === true) {
-      console.error('[KV Metadata] ⚠️ WARNING: Request body đã bị consumed! Không thể gọi request.json() lần nữa.');
-    }
-    
-    // CẢNH BÁO nếu request.json không phải function - LOG CHI TIẾT
-    if (request && 'json' in request) {
-      const jsonType = typeof request.json;
-      if (jsonType !== 'function') {
-        console.error('[KV Metadata] ⚠️⚠️⚠️ CRITICAL: request.json tồn tại nhưng KHÔNG phải function!', {
-          jsonType: jsonType,
-          jsonValue: request.json,
-          jsonValueString: String(request.json),
-          jsonValueJSON: JSON.stringify(request.json),
-          jsonConstructor: request.json?.constructor?.name,
-          jsonPrototype: Object.getPrototypeOf(request.json)?.constructor?.name,
-          jsonIsNull: request.json === null,
-          jsonIsUndefined: request.json === undefined,
-          jsonIsObject: typeof request.json === 'object',
-          jsonIsString: typeof request.json === 'string',
-          jsonIsNumber: typeof request.json === 'number',
-          jsonIsBoolean: typeof request.json === 'boolean',
-          jsonKeys: typeof request.json === 'object' && request.json !== null ? Object.keys(request.json) : 'N/A',
+    if (request.method === 'GET') {
+      console.log('[KV Metadata] GET request - Đang lấy metadata...');
+      const startTime = Date.now();
+      
+      try {
+        const metadata = await kv.get(METADATA_KEY);
+        const duration = Date.now() - startTime;
+        
+        if (metadata) {
+          console.log(`[KV Metadata] ✅ GET thành công trong ${duration}ms`);
+          return new Response(
+            JSON.stringify(metadata),
+            { 
+              status: 200, 
+              headers: { 
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              } 
+            }
+          );
+        } else {
+          console.log(`[KV Metadata] Không có metadata (${duration}ms)`);
+          return new Response(
+            JSON.stringify({
+              catalogs: [],
+              files: [],
+              lastSync: null,
+            }),
+            { 
+              status: 200, 
+              headers: { 
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              } 
+            }
+          );
+        }
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error(`[KV Metadata] ❌ GET error sau ${duration}ms:`, {
+          error: error.message,
+          name: error.name,
         });
-      }
-    } else if (request && typeof request.json === 'undefined') {
-      console.log('[KV Metadata] ℹ️ request.json không tồn tại (undefined) - sẽ dùng fallback');
-    }
-  
-  // Kiểm tra format của KV_REST_API_URL
-  if (process.env.KV_REST_API_URL) {
-    const url = process.env.KV_REST_API_URL;
-    if (!url.startsWith('https://')) {
-      console.error('[KV Metadata] WARNING: KV_REST_API_URL không bắt đầu bằng https://');
-    }
-    if (url.includes('/get/') || url.includes('/set/')) {
-      console.error('[KV Metadata] WARNING: KV_REST_API_URL không nên chứa /get/ hoặc /set/');
-    }
-  }
-
-  if (!hasRedisUrl && !hasUpstash) {
-    return new Response(
-      JSON.stringify({ 
-        error: 'Redis chưa được setup',
-        details: 'Cần setup Redis bằng một trong các cách sau',
-        options: [
-          {
-            name: 'Redis Labs hoặc Redis khác',
-            envVars: ['REDIS_URL'],
-            example: 'REDIS_URL=redis://default:password@host:port',
-            instructions: [
-              '1. Set REDIS_URL trong Vercel Dashboard → Settings → Environment Variables',
-              '2. Format: redis://default:password@host:port',
-              '3. Redeploy project'
-            ]
-          },
-          {
-            name: 'Upstash Redis (Vercel Marketplace)',
-            envVars: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'],
-            instructions: [
-              '1. Vào Vercel Dashboard → Project → Storage',
-              '2. Click "Create Database" → "Upstash Redis"',
-              '3. Connect với project',
-              '4. Vercel sẽ tự động thêm env vars',
-              '5. Redeploy project'
-            ]
-          }
-        ]
-      }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  if (request.method === 'GET') {
-    const handlerStartTime = Date.now();
-    try {
-      console.log('[KV Metadata] 🔵 GET request - Đang lấy metadata từ Redis...');
-      console.log(`[KV Metadata] About to call redisGet()...`);
-      
-      const redisGetStart = Date.now();
-      const metadata = await redisGet(METADATA_KEY);
-      const redisGetDuration = Date.now() - redisGetStart;
-      console.log(`[KV Metadata] ✅ redisGet() completed in ${redisGetDuration}ms`);
-      
-      const handlerDuration = Date.now() - handlerStartTime;
-      
-      if (metadata && typeof metadata === 'object') {
-        console.log(`[KV Metadata] Tìm thấy metadata trên Redis (handler duration: ${handlerDuration}ms)`);
-        // Return ngay lập tức, không log sau khi tạo response
         return new Response(
-          JSON.stringify(metadata),
-          { 
-            status: 200, 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            } 
-          }
-        );
-      } else {
-        console.log(`[KV Metadata] Không có metadata trên Redis, trả về empty (handler duration: ${handlerDuration}ms)`);
-        // Return ngay lập tức, không log sau khi tạo response
-        return new Response(
-          JSON.stringify({
-            catalogs: [],
-            files: [],
-            lastSync: null,
+          JSON.stringify({ 
+            error: 'Không thể đọc metadata từ KV',
+            details: error.message
           }),
           { 
-            status: 200, 
+            status: 500, 
             headers: { 
               'Content-Type': 'application/json',
               'Cache-Control': 'no-cache'
@@ -572,311 +92,113 @@ export default async function handler(request) {
           }
         );
       }
-    } catch (error) {
-      const handlerDuration = Date.now() - handlerStartTime;
-      console.error(`[KV Metadata] Lỗi khi đọc (handler duration: ${handlerDuration}ms):`, {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-        handlerDuration,
-        totalDuration: Date.now() - handlerEntryTime,
-      });
-      const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      // Return ngay lập tức, không log sau khi tạo response
-      return new Response(
-        JSON.stringify({ 
-          error: 'Không thể đọc metadata từ Redis',
-          details: errorMessage
-        }),
-        { 
-          status: 500, 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache'
-          } 
-        }
-      );
     }
-  }
 
-  if (request.method === 'POST') {
-    const postStartTime = Date.now();
-    try {
+    if (request.method === 'POST') {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
+      const postStartTime = Date.now();
       
-      // Đọc body từ request - QUAN TRỌNG: Xử lý cả Web Standard Request và Node.js req object
-      console.log('[KV Metadata] 🔍 Reading request body...');
-      console.log('[KV Metadata] Body used before parsing:', request?.bodyUsed);
-      
-      // Log chi tiết request object TRƯỚC KHI parse
-      const preParseCheck = {
-        hasJson: typeof request?.json === 'function',
-        jsonType: typeof request?.json,
-        jsonValue: request?.json,
-        jsonIsFunction: typeof request?.json === 'function',
-        jsonIsUndefined: typeof request?.json === 'undefined',
-        jsonIsNull: request?.json === null,
-        hasBody: !!request?.body,
-        bodyType: typeof request?.body,
-        bodyIsStream: request?.body instanceof ReadableStream,
-        bodyIsString: typeof request?.body === 'string',
-        bodyIsObject: typeof request?.body === 'object' && request?.body !== null,
-        isRequest: request instanceof Request,
-        constructor: request?.constructor?.name,
-        keys: Object.keys(request || {}).slice(0, 20),
-      };
-      console.log('[KV Metadata] 🔍 Pre-parse check:', JSON.stringify(preParseCheck, null, 2));
-      
-      // QUAN TRỌNG: Nếu request.json tồn tại nhưng KHÔNG phải function, log chi tiết
-      if (request && 'json' in request && typeof request.json !== 'function') {
-        console.error('[KV Metadata] ❌ CRITICAL: request.json tồn tại nhưng KHÔNG phải function!', {
-          jsonType: typeof request.json,
-          jsonValue: request.json,
-          jsonConstructor: request.json?.constructor?.name,
-          jsonToString: String(request.json),
-          jsonStringified: JSON.stringify(request.json),
-        });
-      }
-      
-      let data;
       try {
-        // Kiểm tra nếu body đã bị consumed
-        if (request?.bodyUsed === true) {
-          console.error('[KV Metadata] ⚠️ Request body đã bị consumed! Có thể có middleware đã đọc trước.');
-          throw new Error('Request body đã bị consumed trước đó');
-        }
-        
-        // CÁCH 1: Thử dùng request.json() nếu có (Web Standard Request API)
-        // QUAN TRỌNG: PHẢI check typeof === 'function' TRƯỚC KHI gọi
-        // LƯU Ý: Ở local test với MockRequest có json(), nhưng trên Vercel có thể khác
-        const jsonMethod = request?.json;
-        const isJsonFunction = typeof jsonMethod === 'function';
-        
-        console.log('[KV Metadata] 🔍 Checking request.json:', {
-          exists: 'json' in (request || {}),
-          type: typeof jsonMethod,
-          isFunction: isJsonFunction,
-          value: jsonMethod,
-          isRequestInstance: request instanceof Request,
-          constructor: request?.constructor?.name,
-        });
-        
-        if (isJsonFunction) {
-          console.log('[KV Metadata] ✅ Using request.json() (Web Standard Request API)...');
-          const jsonStartTime = Date.now();
-          try {
-            // SAFE: Đã verify là function rồi mới gọi
-            // QUAN TRỌNG: Wrap trong timeout để tránh hang vô hạn
-            const jsonPromise = jsonMethod.call(request);
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
-            );
-            data = await Promise.race([jsonPromise, timeoutPromise]);
-            const jsonDuration = Date.now() - jsonStartTime;
-            console.log(`[KV Metadata] ✅ Request body parsed successfully via request.json() in ${jsonDuration}ms`);
-            console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
-          } catch (jsonError) {
-            const jsonDuration = Date.now() - jsonStartTime;
-            console.error(`[KV Metadata] ❌ request.json() failed after ${jsonDuration}ms:`, {
-              error: jsonError.message,
-              name: jsonError.name,
-              isTimeout: jsonError.message.includes('timeout'),
-              stack: jsonError.stack?.split('\n').slice(0, 5).join('\n'),
-            });
-            // KHÔNG throw ngay, sẽ thử fallback methods
-            console.log('[KV Metadata] ⚠️ Will try fallback methods...');
+        // Đọc body từ request - Đơn giản với SDK
+        let data;
+        try {
+          // Thử request.json() trước
+          if (typeof request?.json === 'function') {
+            console.log('[KV Metadata] Using request.json()...');
+            data = await request.json();
           }
-        } else {
-          console.log(`[KV Metadata] ⚠️ request.json is NOT a function (type: ${typeof jsonMethod}), will try fallback methods...`);
-        }
-        // CÁCH 2: Thử dùng request.body nếu là object (Vercel Node.js helper)
-        if (!data && request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
-          console.log('[KV Metadata] ✅ Using request.body (Vercel Node.js helper)...');
-          data = request.body;
-          console.log('[KV Metadata] ✅ Request body parsed successfully via request.body');
-        }
-        // CÁCH 3: Thử đọc từ body stream hoặc string
-        if (!data && request?.body) {
-          console.log('[KV Metadata] ✅ Reading from request.body...');
-          if (typeof request.body === 'string') {
-            console.log('[KV Metadata] Body is string, parsing JSON...');
+          // Fallback: request.body nếu là object
+          else if (request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
+            console.log('[KV Metadata] Using request.body...');
+            data = request.body;
+          }
+          // Fallback: Parse từ string
+          else if (typeof request?.body === 'string') {
+            console.log('[KV Metadata] Parsing request.body string...');
             data = JSON.parse(request.body);
-            console.log('[KV Metadata] ✅ Request body parsed successfully from string');
-          } else if (request.body instanceof ReadableStream) {
-            console.log('[KV Metadata] Body is ReadableStream, reading chunks...');
-            const reader = request.body.getReader();
-            const chunks = [];
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(value);
-            }
-            const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
-            data = JSON.parse(bodyText);
-            console.log('[KV Metadata] ✅ Request body parsed successfully from ReadableStream');
-          } else {
-            console.error('[KV Metadata] ❌ Body type không được hỗ trợ:', {
-              bodyType: typeof request.body,
-              bodyConstructor: request.body?.constructor?.name,
-              bodyKeys: Object.keys(request.body || {}).slice(0, 10),
-            });
-            throw new Error(`Không thể đọc request body: body type không được hỗ trợ (${typeof request.body}, constructor: ${request.body?.constructor?.name})`);
           }
-        }
-        // CÁCH 4: Thử wrap trong Request object mới
-        if (!data) {
-          console.log('[KV Metadata] ✅ Trying to create new Request object...');
-          try {
-            const newRequest = new Request(request.url || 'http://localhost', {
-              method: 'POST',
-              body: request.body,
-              headers: request.headers,
-            });
-            data = await newRequest.json();
-            console.log('[KV Metadata] ✅ Request body parsed successfully via new Request object');
-          } catch (wrapError) {
-            console.error('[KV Metadata] ❌ Failed to wrap request:', {
-              error: wrapError.message,
-              name: wrapError.name,
-              stack: wrapError.stack?.split('\n').slice(0, 5).join('\n'),
-            });
-            throw new Error(`Không thể đọc request body: không có cách nào để parse (json: ${typeof request?.json}, body: ${typeof request?.body}, bodyConstructor: ${request?.body?.constructor?.name})`);
+          else {
+            throw new Error('Không thể đọc request body');
           }
-        }
-      } catch (parseError) {
-        // Log chi tiết để debug
-        console.error('[KV Metadata] ❌ Error parsing request body:', {
-          error: parseError.message,
-          name: parseError.name,
-          cause: parseError.cause,
-          bodyUsed: request?.bodyUsed,
-          isAbortError: parseError.name === 'AbortError',
-          requestType: typeof request,
-          hasJson: typeof request?.json === 'function',
-          hasBody: !!request?.body,
-          bodyType: typeof request?.body,
-          requestKeys: Object.keys(request || {}).slice(0, 20),
-          stack: parseError.stack?.split('\n').slice(0, 10).join('\n'),
-        });
-        
-        // Nếu là AbortError từ client, không phải lỗi server
-        if (parseError.name === 'AbortError') {
-          throw new Error(`Client đã abort request: ${parseError.message}`);
+        } catch (parseError) {
+          console.error('[KV Metadata] ❌ Error parsing body:', parseError.message);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Không thể đọc request body',
+              details: parseError.message
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
         }
         
-        throw new Error(`Không thể đọc request body: ${parseError.message}`);
-      }
-      
-      console.log('[KV Metadata] POST request - Body parsed successfully:', {
-        catalogsCount: data?.catalogs?.length || 0,
-        filesCount: data?.files?.length || 0,
-        hasLastSync: !!data?.lastSync,
-        parseDuration: Date.now() - postStartTime,
-      });
-      
-      const { catalogs, files, lastSync } = data;
-
-      const metadata = {
-        catalogs: catalogs || [],
-        files: files || [],
-        lastSync: lastSync || Date.now(),
-        version: 1,
-      };
-
-      // Log payload size để debug
-      const stringifyStart = Date.now();
-      const payloadSize = JSON.stringify(metadata).length;
-      const stringifyDuration = Date.now() - stringifyStart;
-      const payloadSizeKB = (payloadSize / 1024).toFixed(2);
-      console.log(`[KV Metadata] Payload size: ${payloadSizeKB} KB, stringify took ${stringifyDuration}ms`);
-      console.log(`[KV Metadata] 🟢 Đang lưu metadata lên Redis... (${metadata.catalogs.length} catalogs, ${metadata.files.length} files)`);
-      console.log(`[KV Metadata] About to call redisSet()...`);
-      
-      const redisSetStartTime = Date.now();
-      await redisSet(METADATA_KEY, metadata);
-      const redisSetDuration = Date.now() - redisSetStartTime;
-      console.log(`[KV Metadata] ✅ redisSet() completed in ${redisSetDuration}ms`);
-      
-      const totalPostDuration = Date.now() - postStartTime;
-      console.log(`[KV Metadata] ✅ Lưu thành công (Redis SET: ${redisSetDuration}ms, total POST: ${totalPostDuration}ms)`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          lastSync: metadata.lastSync,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
-    } catch (error) {
-      const errorDuration = Date.now() - postStartTime;
-      console.error('[KV Metadata] Lỗi khi lưu:', {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-        duration: errorDuration,
-        requestMethod: request?.method,
-        requestType: typeof request,
-        hasJson: typeof request?.json === 'function',
-        handlerDuration: Date.now() - handlerEntryTime,
-      });
-      
-      // Log chi tiết về error để debug
-      if (error.message.includes('json is not a function')) {
-        console.error('[KV Metadata] DETAILED DEBUG - Request object inspection:', {
-          type: typeof request,
-          constructor: request?.constructor?.name,
-          prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
-          keys: Object.keys(request || {}),
-          hasJson: typeof request?.json,
-          hasText: typeof request?.text,
-          hasBody: !!request?.body,
-          bodyType: typeof request?.body,
-          isRequest: request instanceof Request,
-          requestStringified: JSON.stringify(request, null, 2).substring(0, 500),
+        console.log('[KV Metadata] Body parsed:', {
+          catalogsCount: data?.catalogs?.length || 0,
+          filesCount: data?.files?.length || 0,
         });
+        
+        const { catalogs, files, lastSync } = data;
+        const metadata = {
+          catalogs: catalogs || [],
+          files: files || [],
+          lastSync: lastSync || Date.now(),
+          version: 1,
+        };
+        
+        // Lưu vào KV - Đơn giản với SDK
+        console.log('[KV Metadata] Đang lưu vào KV...');
+        const setStartTime = Date.now();
+        await kv.set(METADATA_KEY, metadata);
+        const setDuration = Date.now() - setStartTime;
+        
+        const totalDuration = Date.now() - postStartTime;
+        console.log(`[KV Metadata] ✅ SET thành công trong ${setDuration}ms (total: ${totalDuration}ms)`);
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            lastSync: metadata.lastSync,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        const errorDuration = Date.now() - postStartTime;
+        console.error(`[KV Metadata] ❌ POST error sau ${errorDuration}ms:`, {
+          error: error.message,
+          name: error.name,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        });
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Không thể lưu metadata lên KV',
+            details: error.message
+          }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
       }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: 'Không thể lưu metadata lên Redis',
-          details: error.message,
-          debug: {
-            errorName: error.name,
-            errorType: typeof error,
-            requestType: typeof request,
-            hasJsonMethod: typeof request?.json === 'function',
-          }
-        }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
     }
-  }
 
+    // Method not allowed
     return new Response(
       JSON.stringify({ error: 'Method not allowed' }),
       { status: 405, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (handlerError) {
-    // Catch mọi lỗi không được handle
-    console.error('[KV Metadata] ❌ UNHANDLED ERROR trong handler:', {
+    const handlerDuration = Date.now() - handlerEntryTime;
+    console.error(`[KV Metadata] ❌ UNHANDLED ERROR sau ${handlerDuration}ms:`, {
       error: handlerError.message,
-      stack: handlerError.stack,
       name: handlerError.name,
-      handlerDuration: Date.now() - handlerEntryTime,
     });
     
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        details: handlerError.message,
-        debug: {
-          errorName: handlerError.name,
-          handlerDuration: Date.now() - handlerEntryTime,
-        }
+        details: handlerError.message
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   } finally {
-    console.log('[KV Metadata] ========== HANDLER END ==========');
-    console.log('[KV Metadata] Total handler duration:', Date.now() - handlerEntryTime, 'ms');
+    const totalDuration = Date.now() - handlerEntryTime;
+    console.log(`[KV Metadata] ========== HANDLER END ========== (${totalDuration}ms)`);
   }
 }
