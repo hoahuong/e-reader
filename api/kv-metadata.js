@@ -45,14 +45,17 @@ async function redisGetUpstash(key) {
   try {
     // Upstash REST API: GET command format
     // https://{region}-{database-name}-{id}.upstash.io/get/{key}
+    console.log(`[KV Metadata] GET request to: ${process.env.KV_REST_API_URL}/get/${key}`);
     const response = await fetch(`${process.env.KV_REST_API_URL}/get/${key}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
       },
       // Add timeout để tránh hang
-      signal: AbortSignal.timeout(8000), // 8s timeout
+      signal: AbortSignal.timeout(10000), // 10s timeout để match với client
     });
+    
+    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -104,31 +107,25 @@ async function redisGetUpstash(key) {
 
 async function redisSetUpstash(key, value) {
   try {
-    // Upstash REST API: SET command cần value trong URL path, không phải body
-    // Format: /set/{key}/{value}
-    // Value cần được encode để tránh special characters
     const valueStr = JSON.stringify(value);
-    const encodedValue = encodeURIComponent(valueStr);
     
-    // Kiểm tra độ dài URL - Upstash có giới hạn URL length
-    const url = `${process.env.KV_REST_API_URL}/set/${key}/${encodedValue}`;
-    if (url.length > 8000) {
-      // Nếu URL quá dài, có thể dùng POST với body (nếu Upstash hỗ trợ)
-      // Hoặc chia nhỏ payload
-      console.warn('[KV Metadata] Payload quá lớn, có thể gây timeout');
-    }
-    
-    const response = await fetch(url, {
-      method: 'GET', // Upstash REST API dùng GET cho SET command
+    // Upstash REST API hỗ trợ POST với body cho JSON/binary values
+    // Đây là cách tốt hơn cho payload lớn thay vì dùng GET với URL path
+    // Theo docs: "To post a JSON or a binary value, you can use an HTTP POST request and set value as the request body"
+    const response = await fetch(`${process.env.KV_REST_API_URL}/set/${key}`, {
+      method: 'POST', // Dùng POST với body thay vì GET với URL path
       headers: {
         'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+        'Content-Type': 'application/json',
       },
+      body: valueStr, // Value trong body, không cần encode trong URL
       // Add timeout để tránh hang
-      signal: AbortSignal.timeout(8000), // 8s timeout
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`[KV Metadata] Redis SET failed: ${response.status} - ${errorText}`);
       throw new Error(`Redis SET failed: ${response.status} - ${errorText}`);
     }
 
@@ -146,7 +143,7 @@ async function redisSetUpstash(key, value) {
     console.error('[KV Metadata] Redis SET error:', error);
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error('Redis SET request timeout - có thể do network hoặc payload quá lớn');
+      throw new Error('Redis SET request timeout - có thể do network hoặc Redis không khả dụng');
     }
     throw error;
   }
@@ -205,6 +202,15 @@ export default async function handler(request) {
   // Kiểm tra Redis đã được setup chưa
   const hasRedisUrl = !!process.env.REDIS_URL;
   const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+
+  // Debug logging để điều tra nguyên nhân
+  console.log('[KV Metadata] Handler called:', {
+    method: request.method,
+    hasRedisUrl,
+    hasUpstash,
+    kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
+    kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
+  });
 
   if (!hasRedisUrl && !hasUpstash) {
     return new Response(
