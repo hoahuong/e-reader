@@ -19,7 +19,8 @@ export async function loadMetadataFromCloud() {
     console.log('[Metadata Sync KV] Đang load metadata từ Vercel KV...');
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // Giảm xuống 8s để tránh timeout
+    const timeoutMs = 10000; // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     try {
       const response = await fetch('/api/kv-metadata', {
@@ -78,7 +79,7 @@ export async function loadMetadataFromCloud() {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn('[Metadata Sync KV] Request timeout sau 10s');
+        console.warn(`[Metadata Sync KV] Request timeout sau ${timeoutMs}ms, fallback về IndexedDB`);
         return null;
       }
       throw fetchError;
@@ -86,7 +87,7 @@ export async function loadMetadataFromCloud() {
   } catch (error) {
     // Handle network errors, CORS errors, etc.
     if (error.name === 'AbortError') {
-      console.warn('[Metadata Sync KV] Request timeout sau 10s, fallback về IndexedDB');
+      console.warn(`[Metadata Sync KV] Request timeout sau ${timeoutMs}ms, fallback về IndexedDB`);
     } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
       console.warn('[Metadata Sync KV] Network error, fallback về IndexedDB:', error.message);
     } else {
@@ -111,7 +112,8 @@ export async function saveMetadataToCloud(catalogs, files) {
     console.log(`[Metadata Sync KV] Đang lưu metadata lên Vercel KV: ${payload.catalogs.length} catalogs, ${payload.files.length} files`);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Tăng lên 15s để đủ thời gian cho Upstash
+    const timeoutMs = 15000; // 15s timeout cho save operation
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     try {
       const response = await fetch('/api/kv-metadata', {
@@ -168,7 +170,7 @@ export async function saveMetadataToCloud(catalogs, files) {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn('[Metadata Sync KV] Request timeout sau 15s, sẽ lưu local thay thế');
+        console.warn(`[Metadata Sync KV] Request timeout sau ${timeoutMs}ms, sẽ lưu local thay thế`);
         // Không throw error, chỉ log warning và return null để fallback về local
         return null;
       }

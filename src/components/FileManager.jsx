@@ -59,7 +59,7 @@ function FileManager({ onFileSelect }) {
           console.log('[FileManager] Bắt đầu load metadata từ cloud (background)...');
           const cloudMetadata = await loadMetadataFromCloud();
           
-          if (cloudMetadata) {
+          if (cloudMetadata && (cloudMetadata.catalogs?.length > 0 || cloudMetadata.files?.length > 0)) {
             // Kiểm tra xem có data mới không
             const hasNewCatalogs = cloudMetadata.catalogs?.length > catalogsList.length;
             const hasNewFiles = cloudMetadata.files?.length > filesList.length;
