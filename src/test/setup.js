@@ -1,3 +1,6 @@
+// Import polyfills trước tiên
+import './polyfills.js';
+
 import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -6,41 +9,6 @@ import '@testing-library/jest-dom';
 afterEach(() => {
   cleanup();
 });
-
-// Fix webidl-conversions và whatwg-url errors trong Node.js environment
-// Các globals này cần được định nghĩa trước khi jsdom load
-if (typeof globalThis !== 'undefined') {
-  // Polyfill cho webidl-conversions
-  if (!globalThis.URL) {
-    globalThis.URL = class URL {
-      constructor(url, base) {
-        this.href = url;
-        this.origin = '';
-        this.protocol = '';
-        this.host = '';
-        this.hostname = '';
-        this.port = '';
-        this.pathname = '';
-        this.search = '';
-        this.hash = '';
-      }
-      toString() { return this.href; }
-    };
-  }
-  
-  if (!globalThis.URLSearchParams) {
-    globalThis.URLSearchParams = class URLSearchParams {
-      constructor() {
-        this.params = new Map();
-      }
-      get(key) { return this.params.get(key); }
-      set(key, value) { this.params.set(key, value); }
-      has(key) { return this.params.has(key); }
-      delete(key) { this.params.delete(key); }
-      append(key, value) { this.params.set(key, value); }
-    };
-  }
-}
 
 // Mock localStorage
 const localStorageMock = {
