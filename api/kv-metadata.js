@@ -468,9 +468,24 @@ export default async function handler(request) {
     try {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
       
-      // Đọc body từ request - giống như save-metadata.js (đơn giản và đã hoạt động tốt)
+      // Đọc body từ request với timeout protection
       console.log('[KV Metadata] Reading request body...');
-      const data = await request.json();
+      let data;
+      try {
+        // Wrap trong Promise.race để có timeout
+        const jsonPromise = request.json();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
+        );
+        data = await Promise.race([jsonPromise, timeoutPromise]);
+        console.log('[KV Metadata] Request body parsed successfully');
+      } catch (parseError) {
+        console.error('[KV Metadata] ❌ Error parsing request body:', {
+          error: parseError.message,
+          name: parseError.name,
+        });
+        throw new Error(`Không thể đọc request body: ${parseError.message}`);
+      }
       
       console.log('[KV Metadata] POST request - Body parsed successfully:', {
         catalogsCount: data?.catalogs?.length || 0,
