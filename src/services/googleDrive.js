@@ -19,9 +19,10 @@ export function loadGoogleAPIs() {
   return new Promise((resolve, reject) => {
     let gapiCheck = false;
     let gisCheck = false;
+    let pickerCheck = false;
 
     const checkAndResolve = () => {
-      if (gapiCheck && gisCheck) {
+      if (gapiCheck && gisCheck && pickerCheck) {
         resolve();
       }
     };
@@ -71,6 +72,29 @@ export function loadGoogleAPIs() {
         };
         gisScript.onerror = () => reject(new Error('Failed to load Google Identity Services'));
         document.head.appendChild(gisScript);
+      }
+    }
+
+    // Load Google Picker API
+    if (window.google?.picker) {
+      pickerCheck = true;
+      checkAndResolve();
+    } else {
+      const existingPicker = document.querySelector('script[src*="picker"]');
+      if (existingPicker) {
+        existingPicker.onload = () => {
+          pickerCheck = true;
+          checkAndResolve();
+        };
+      } else {
+        const pickerScript = document.createElement('script');
+        pickerScript.src = 'https://apis.google.com/js/picker.js';
+        pickerScript.onload = () => {
+          pickerCheck = true;
+          checkAndResolve();
+        };
+        pickerScript.onerror = () => reject(new Error('Failed to load Google Picker API'));
+        document.head.appendChild(pickerScript);
       }
     }
   });
@@ -212,6 +236,74 @@ export function logoutGoogle() {
   }
   localStorage.removeItem('google_access_token');
   localStorage.removeItem('google_token_expiry');
+}
+
+/**
+ * Mở Google Drive Picker để chọn folder
+ * @param {Function} callback - Callback function nhận (folderId, folderName)
+ */
+export async function openDriveFolderPicker(callback) {
+  try {
+    // Đảm bảo Google APIs đã được load
+    await loadGoogleAPIs();
+    await initializeGoogleAPI();
+
+    if (!isLoggedIn()) {
+      throw new Error('Chưa đăng nhập Google');
+    }
+
+    const token = window.gapi?.client?.getToken();
+    if (!token || !token.access_token) {
+      throw new Error('Không có access token');
+    }
+
+    // Tạo DocsView với folder selection enabled
+    const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+      .setIncludeFolders(true)
+      .setMimeTypes('application/vnd.google-apps.folder')
+      .setSelectFolderEnabled(true);
+
+    // Tạo Picker với origin đúng để tránh COOP error
+    const pickerBuilder = new google.picker.PickerBuilder()
+      .setOAuthToken(token.access_token)
+      .addView(docsView)
+      .setOrigin(window.location.origin) // Set origin để tránh COOP error
+      .setCallback((data) => {
+        try {
+          if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+            const folder = data[google.picker.Response.DOCUMENTS][0];
+            if (folder && folder.id) {
+              callback(folder.id, folder.name || 'Untitled Folder');
+            }
+          } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+            console.log('User cancelled folder selection');
+            // Callback với null để báo user đã cancel
+            callback(null, null);
+          }
+        } catch (error) {
+          console.error('Error in picker callback:', error);
+          callback(null, null);
+        }
+      });
+
+    // Chỉ set API Key nếu có (optional nhưng khuyến nghị)
+    if (GOOGLE_API_KEY) {
+      pickerBuilder.setDeveloperKey(GOOGLE_API_KEY);
+    }
+
+    try {
+      const picker = pickerBuilder.build();
+      picker.setVisible(true);
+    } catch (error) {
+      console.error('Error building/showing picker:', error);
+      // Fallback: Nếu picker không hoạt động, có thể do COOP
+      // Thử lại với origin khác hoặc báo lỗi
+      throw new Error('Không thể mở Google Drive Picker. Vui lòng thử lại hoặc chọn folder từ danh sách bên dưới.');
+    }
+  } catch (error) {
+    console.error('Error opening Drive folder picker:', error);
+    throw error;
+  }
 }
 
 /**

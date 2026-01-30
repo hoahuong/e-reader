@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { listFolders, isLoggedIn, initializeGoogleAPI, loginGoogle } from '../services/googleDrive';
+import { useState, useEffect } from 'react';
+import { listFolders, isLoggedIn, initializeGoogleAPI, loginGoogle, openDriveFolderPicker } from '../services/googleDrive';
 import { extractErrorMessage } from '../utils/errorHandler';
 import './DriveFolderSelector.css';
 
@@ -11,8 +11,8 @@ function DriveFolderSelector({ selectedFolderId, onFolderChange, onCreateFolder 
   const [newFolderName, setNewFolderName] = useState('');
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isOpeningPicker, setIsOpeningPicker] = useState(false);
 
   useEffect(() => {
     loadFolders();
@@ -116,81 +116,27 @@ function DriveFolderSelector({ selectedFolderId, onFolderChange, onCreateFolder 
     }
   };
 
-  // Flatten folder tree để search dễ hơn
-  const flattenFolders = (folderList, level = 0, parentPath = '') => {
-    const result = [];
-    folderList.forEach(folder => {
-      const path = parentPath ? `${parentPath} > ${folder.name}` : folder.name;
-      result.push({ ...folder, level, path });
-      if (folder.children && folder.children.length > 0) {
-        result.push(...flattenFolders(folder.children, level + 1, path));
-      }
-    });
-    return result;
+  const handleOpenGooglePicker = async () => {
+    try {
+      setIsOpeningPicker(true);
+      setError(null);
+      
+      await openDriveFolderPicker((folderId, folderName) => {
+        // Callback khi user chọn folder từ Google Picker
+        if (folderId && folderName) {
+          handleFolderSelect(folderId, folderName);
+        }
+        // Nếu folderId là null, user đã cancel - không làm gì
+        setIsOpeningPicker(false);
+      });
+    } catch (err) {
+      console.error('Error opening Google Picker:', err);
+      const errorMessage = extractErrorMessage(err);
+      setError('Không thể mở Google Drive Picker: ' + errorMessage + '. Bạn có thể chọn folder từ danh sách bên dưới.');
+      setIsOpeningPicker(false);
+    }
   };
 
-  // Filter folders dựa trên search query
-  const filteredFolders = useMemo(() => {
-    // Defensive check: đảm bảo folders là array
-    if (!folders || !Array.isArray(folders)) {
-      return [];
-    }
-
-    if (!searchQuery.trim()) {
-      return folders;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    const flatList = flattenFolders(folders);
-    const matched = flatList.filter(f => 
-      f.name.toLowerCase().includes(query) || 
-      f.path.toLowerCase().includes(query)
-    );
-
-    if (matched.length === 0) {
-      return [];
-    }
-
-    // Rebuild tree structure với matched folders và parents
-    const matchedIds = new Set(matched.map(f => f.id));
-    
-    const includeParents = (folder) => {
-      if (matchedIds.has(folder.id)) return true;
-      if (folder.children && folder.children.length > 0) {
-        return folder.children.some(child => includeParents(child));
-      }
-      return false;
-    };
-
-    const filterTree = (folderList) => {
-      // Defensive check
-      if (!folderList || !Array.isArray(folderList)) {
-        return [];
-      }
-
-      return folderList
-        .filter(folder => folder && folder.id && includeParents(folder))
-        .map(folder => {
-          const filteredChildren = folder.children && Array.isArray(folder.children) && folder.children.length > 0 
-            ? filterTree(folder.children) 
-            : undefined;
-          
-          return {
-            ...folder,
-            children: filteredChildren && filteredChildren.length > 0 ? filteredChildren : undefined,
-          };
-        })
-        .filter(folder => {
-          // Keep folder if it matches or has matching children
-          return folder && folder.id && (
-            matchedIds.has(folder.id) || 
-            (folder.children && Array.isArray(folder.children) && folder.children.length > 0)
-          );
-        });
-    };
-
-    return filterTree(folders);
-  }, [folders, searchQuery]);
 
   const renderFolderTree = (folderList, level = 0) => {
     // Defensive check
@@ -284,24 +230,40 @@ function DriveFolderSelector({ selectedFolderId, onFolderChange, onCreateFolder 
         </div>
       </div>
 
-      {/* Search box */}
+      {/* Google Drive Picker Button - Dùng Google Drive search thay vì custom search */}
       <div className="folder-search-container">
-        <input
-          type="text"
-          className="folder-search-input"
-          placeholder="🔍 Tìm folder..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            className="btn-clear-search"
-            onClick={() => setSearchQuery('')}
-            aria-label="Xóa tìm kiếm"
-          >
-            ✕
-          </button>
+        <button
+          type="button"
+          className="btn-google-picker"
+          onClick={handleOpenGooglePicker}
+          disabled={isOpeningPicker}
+          aria-label="Mở Google Drive Picker để tìm và chọn folder"
+        >
+          {isOpeningPicker ? '⏳ Đang mở...' : '🔍 Tìm folder bằng Google Drive'}
+        </button>
+        {selectedFolderId && (
+          <div className="selected-folder-preview">
+            📍 Đã chọn: <strong>
+              {selectedFolderId === 'root'
+                ? 'My Drive (Root)'
+                : (folders && Array.isArray(folders)
+                    ? (() => {
+                        const findFolder = (list, id) => {
+                          for (const f of list) {
+                            if (f?.id === id) return f.name;
+                            if (f?.children) {
+                              const found = findFolder(f.children, id);
+                              if (found) return found;
+                            }
+                          }
+                          return null;
+                        };
+                        return findFolder(folders, selectedFolderId) || selectedFolderId;
+                      })()
+                    : selectedFolderId)
+              }
+            </strong>
+          </div>
         )}
       </div>
 
@@ -365,52 +327,21 @@ function DriveFolderSelector({ selectedFolderId, onFolderChange, onCreateFolder 
           <div className="error-message" role="alert">
             <strong>⚠️ Lỗi:</strong> {error}
           </div>
-        ) : filteredFolders.length === 0 ? (
+        ) : folders.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
-            <div className="empty-state-title">
-              {searchQuery ? 'Không tìm thấy folder' : 'Chưa có folders'}
-            </div>
+            <div className="empty-state-icon">📁</div>
+            <div className="empty-state-title">Chưa có folders</div>
             <div className="empty-state-message">
-              {searchQuery 
-                ? `Không có folder nào khớp với "${searchQuery}"`
-                : 'Tạo folder mới để tổ chức PDF của bạn trên Google Drive'
-              }
+              Tạo folder mới để tổ chức PDF của bạn trên Google Drive
             </div>
-            {searchQuery && (
-              <button
-                type="button"
-                className="btn-clear-search-inline"
-                onClick={() => setSearchQuery('')}
-              >
-                Xóa tìm kiếm
-              </button>
-            )}
           </div>
         ) : (
           <div className="folders-tree">
-            {renderFolderTree(filteredFolders)}
-            {searchQuery && filteredFolders.length > 0 && (
-              <div className="search-results-info">
-                🔍 Tìm thấy {filteredFolders.length} folder{filteredFolders.length > 1 ? 's' : ''} khớp với "{searchQuery}"
-              </div>
-            )}
+            {renderFolderTree(folders)}
           </div>
         )}
       </div>
 
-      {selectedFolderId && (
-        <div className="selected-folder-info">
-          📍 Folder đã chọn: <strong>
-            {selectedFolderId === 'root' 
-              ? 'My Drive (Root)' 
-              : (folders && Array.isArray(folders) 
-                  ? folders.find(f => f?.id === selectedFolderId)?.name || selectedFolderId
-                  : selectedFolderId)
-            }
-          </strong>
-        </div>
-      )}
     </div>
   );
 }

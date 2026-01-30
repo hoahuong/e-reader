@@ -13,6 +13,11 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+    // Headers để tránh COOP error với Google Picker
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups', // Cho phép popup từ same origin
+      'Cross-Origin-Embedder-Policy': 'unsafe-none', // Không block cross-origin embeds
+    },
     // Proxy API routes đến Vercel dev server nếu đang chạy
     // Hoặc sẽ fallback về mock/error nếu không có Vercel dev
     proxy: {
