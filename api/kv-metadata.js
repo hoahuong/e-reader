@@ -113,20 +113,30 @@ async function redisGetUpstash(key) {
 async function redisSetUpstash(key, value) {
   try {
     const valueStr = JSON.stringify(value);
+    const valueSize = new Blob([valueStr]).size;
+    console.log(`[KV Metadata] SET request - key: ${key}, value size: ${valueSize} bytes`);
+    
+    const url = `${process.env.KV_REST_API_URL}/set/${key}`;
+    console.log(`[KV Metadata] SET request to: ${url.substring(0, 50)}...`);
+    console.log(`[KV Metadata] Token present: ${!!process.env.KV_REST_API_TOKEN}`);
     
     // Upstash REST API hỗ trợ POST với body cho JSON/binary values
     // Đây là cách tốt hơn cho payload lớn thay vì dùng GET với URL path
     // Theo docs: "To post a JSON or a binary value, you can use an HTTP POST request and set value as the request body"
-    const response = await fetch(`${process.env.KV_REST_API_URL}/set/${key}`, {
+    const startTime = Date.now();
+    const response = await fetch(url, {
       method: 'POST', // Dùng POST với body thay vì GET với URL path
       headers: {
         'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain', // Upstash expects text/plain, not application/json
       },
       body: valueStr, // Value trong body, không cần encode trong URL
       // Add timeout để tránh hang
       signal: AbortSignal.timeout(10000), // 10s timeout
     });
+    
+    const duration = Date.now() - startTime;
+    console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -208,7 +218,7 @@ export default async function handler(request) {
   const hasRedisUrl = !!process.env.REDIS_URL;
   const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
-  // Debug logging để điều tra nguyên nhân
+  // Debug logging để điều tra nguyên nhân timeout
   console.log('[KV Metadata] Handler called:', {
     method: request.method,
     hasRedisUrl,
@@ -216,6 +226,17 @@ export default async function handler(request) {
     kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
     kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
   });
+  
+  // Kiểm tra format của KV_REST_API_URL
+  if (process.env.KV_REST_API_URL) {
+    const url = process.env.KV_REST_API_URL;
+    if (!url.startsWith('https://')) {
+      console.error('[KV Metadata] WARNING: KV_REST_API_URL không bắt đầu bằng https://');
+    }
+    if (url.includes('/get/') || url.includes('/set/')) {
+      console.error('[KV Metadata] WARNING: KV_REST_API_URL không nên chứa /get/ hoặc /set/');
+    }
+  }
 
   if (!hasRedisUrl && !hasUpstash) {
     return new Response(
