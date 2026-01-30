@@ -112,7 +112,14 @@ async function redisGetUpstash(key) {
   } catch (error) {
     // Đảm bảo cleanup timeout trong catch
     clearTimeout(timeoutId);
-    console.error('[KV Metadata] Redis GET error:', error);
+    console.error('[KV Metadata] Redis GET error:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause,
+      url: `${process.env.KV_REST_API_URL}/get/${key}`,
+      hasToken: !!process.env.KV_REST_API_TOKEN,
+    });
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw new Error('Redis request timeout - có thể do network hoặc Redis không khả dụng');
@@ -175,7 +182,15 @@ async function redisSetUpstash(key, value) {
   } catch (error) {
     // Đảm bảo cleanup timeout trong catch
     clearTimeout(timeoutId);
-    console.error('[KV Metadata] Redis SET error:', error);
+    console.error('[KV Metadata] Redis SET error:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause,
+      url: `${process.env.KV_REST_API_URL}/set/${key}`,
+      hasToken: !!process.env.KV_REST_API_TOKEN,
+      valueSize: valueSize,
+    });
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw new Error('Redis SET request timeout - có thể do network hoặc Redis không khả dụng');
@@ -240,7 +255,7 @@ export default async function handler(request) {
   const hasRedisUrl = !!process.env.REDIS_URL;
   const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
-  // Debug logging để điều tra nguyên nhân timeout
+  // Debug logging chi tiết để điều tra
   console.log('[KV Metadata] Handler called:', {
     method: request.method,
     hasRedisUrl,
@@ -248,6 +263,20 @@ export default async function handler(request) {
     kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
     kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
     timestamp: handlerEntryTime,
+  });
+  
+  // Debug request object properties
+  console.log('[KV Metadata] Request object debug:', {
+    type: typeof request,
+    constructor: request?.constructor?.name,
+    isRequest: request instanceof Request,
+    hasJson: typeof request?.json === 'function',
+    hasText: typeof request?.text === 'function',
+    hasBody: !!request?.body,
+    bodyType: typeof request?.body,
+    method: request?.method,
+    url: request?.url,
+    headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
   });
   
   // Kiểm tra format của KV_REST_API_URL
@@ -335,7 +364,13 @@ export default async function handler(request) {
       }
     } catch (error) {
       const handlerDuration = Date.now() - handlerStartTime;
-      console.error(`[KV Metadata] Lỗi khi đọc (handler duration: ${handlerDuration}ms):`, error);
+      console.error(`[KV Metadata] Lỗi khi đọc (handler duration: ${handlerDuration}ms):`, {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+        handlerDuration,
+        totalDuration: Date.now() - handlerEntryTime,
+      });
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
       // Return ngay lập tức, không log sau khi tạo response
       return new Response(
@@ -355,9 +390,75 @@ export default async function handler(request) {
   }
 
   if (request.method === 'POST') {
+    const postStartTime = Date.now();
     try {
-      // Đọc body từ request - giống như các API khác
-      const data = await request.json();
+      console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
+      
+      // Đọc body từ request với error handling chi tiết
+      let data;
+      try {
+        // Kiểm tra xem request có method json() không
+        if (typeof request.json !== 'function') {
+          console.error('[KV Metadata] ERROR: request.json is not a function');
+          console.error('[KV Metadata] Request object:', {
+            type: typeof request,
+            constructor: request?.constructor?.name,
+            keys: Object.keys(request || {}),
+            prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
+          });
+          
+          // Thử các cách khác để đọc body
+          if (request.body) {
+            console.log('[KV Metadata] Trying to read from request.body...');
+            if (typeof request.body === 'string') {
+              data = JSON.parse(request.body);
+            } else if (request.body instanceof ReadableStream) {
+              const reader = request.body.getReader();
+              const chunks = [];
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+              }
+              const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
+              data = JSON.parse(bodyText);
+            } else {
+              // Thử wrap trong Request object mới
+              console.log('[KV Metadata] Trying to create new Request object...');
+              const newRequest = new Request(request.url || 'http://localhost', {
+                method: 'POST',
+                body: request.body,
+                headers: request.headers,
+              });
+              data = await newRequest.json();
+            }
+          } else {
+            throw new Error('request.json is not a function and request.body is not available');
+          }
+        } else {
+          // Normal case: request.json() exists
+          console.log('[KV Metadata] Reading body using request.json()...');
+          data = await request.json();
+        }
+      } catch (bodyError) {
+        console.error('[KV Metadata] ERROR reading request body:', {
+          error: bodyError.message,
+          stack: bodyError.stack,
+          name: bodyError.name,
+          requestType: typeof request,
+          hasJson: typeof request?.json === 'function',
+          hasBody: !!request?.body,
+        });
+        throw new Error(`Không thể đọc request body: ${bodyError.message}`);
+      }
+      
+      console.log('[KV Metadata] POST request - Body parsed successfully:', {
+        catalogsCount: data?.catalogs?.length || 0,
+        filesCount: data?.files?.length || 0,
+        hasLastSync: !!data?.lastSync,
+        parseDuration: Date.now() - postStartTime,
+      });
+      
       const { catalogs, files, lastSync } = data;
 
       const metadata = {
@@ -379,11 +480,44 @@ export default async function handler(request) {
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     } catch (error) {
-      console.error('[KV Metadata] Lỗi khi lưu:', error);
+      const errorDuration = Date.now() - postStartTime;
+      console.error('[KV Metadata] Lỗi khi lưu:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+        duration: errorDuration,
+        requestMethod: request?.method,
+        requestType: typeof request,
+        hasJson: typeof request?.json === 'function',
+        handlerDuration: Date.now() - handlerEntryTime,
+      });
+      
+      // Log chi tiết về error để debug
+      if (error.message.includes('json is not a function')) {
+        console.error('[KV Metadata] DETAILED DEBUG - Request object inspection:', {
+          type: typeof request,
+          constructor: request?.constructor?.name,
+          prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
+          keys: Object.keys(request || {}),
+          hasJson: typeof request?.json,
+          hasText: typeof request?.text,
+          hasBody: !!request?.body,
+          bodyType: typeof request?.body,
+          isRequest: request instanceof Request,
+          requestStringified: JSON.stringify(request, null, 2).substring(0, 500),
+        });
+      }
+      
       return new Response(
         JSON.stringify({ 
           error: 'Không thể lưu metadata lên Redis',
-          details: error.message 
+          details: error.message,
+          debug: {
+            errorName: error.name,
+            errorType: typeof error,
+            requestType: typeof request,
+            hasJsonMethod: typeof request?.json === 'function',
+          }
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
