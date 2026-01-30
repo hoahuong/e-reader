@@ -463,60 +463,60 @@ export default async function handler(request) {
     try {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
       
-      // Đọc body từ request với error handling chi tiết
+      // Đọc body từ request - thử nhiều cách để tương thích với các Vercel runtime khác nhau
       let data;
       try {
-        // Kiểm tra xem request có method json() không
-        if (typeof request.json !== 'function') {
-          console.error('[KV Metadata] ERROR: request.json is not a function');
-          console.error('[KV Metadata] Request object:', {
-            type: typeof request,
-            constructor: request?.constructor?.name,
-            keys: Object.keys(request || {}),
-            prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
-          });
-          
-          // Thử các cách khác để đọc body
-          if (request.body) {
-            console.log('[KV Metadata] Trying to read from request.body...');
-            if (typeof request.body === 'string') {
-              data = JSON.parse(request.body);
-            } else if (request.body instanceof ReadableStream) {
-              const reader = request.body.getReader();
-              const chunks = [];
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-              }
-              const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
-              data = JSON.parse(bodyText);
-            } else {
-              // Thử wrap trong Request object mới
-              console.log('[KV Metadata] Trying to create new Request object...');
-              const newRequest = new Request(request.url || 'http://localhost', {
-                method: 'POST',
-                body: request.body,
-                headers: request.headers,
-              });
-              data = await newRequest.json();
-            }
-          } else {
-            throw new Error('request.json is not a function and request.body is not available');
-          }
-        } else {
-          // Normal case: request.json() exists
-          console.log('[KV Metadata] Reading body using request.json()...');
+        // Cách 1: Thử dùng request.body (Vercel Node.js helper)
+        if (request.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
+          console.log('[KV Metadata] Using request.body (Vercel Node.js helper)...');
+          data = request.body;
+        }
+        // Cách 2: Thử dùng request.json() (Web Standard Request API)
+        else if (typeof request.json === 'function') {
+          console.log('[KV Metadata] Using request.json() (Web Standard API)...');
           data = await request.json();
         }
+        // Cách 3: Thử đọc từ body stream
+        else if (request.body) {
+          console.log('[KV Metadata] Reading from request.body stream...');
+          if (typeof request.body === 'string') {
+            data = JSON.parse(request.body);
+          } else if (request.body instanceof ReadableStream) {
+            const reader = request.body.getReader();
+            const chunks = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+            }
+            const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
+            data = JSON.parse(bodyText);
+          } else {
+            // Thử wrap trong Request object mới
+            console.log('[KV Metadata] Creating new Request object...');
+            const newRequest = new Request(request.url || 'http://localhost', {
+              method: 'POST',
+              body: request.body,
+              headers: request.headers,
+            });
+            data = await newRequest.json();
+          }
+        } else {
+          // Fallback: Thử clone request và đọc lại
+          console.log('[KV Metadata] Trying to clone request...');
+          const clonedRequest = request.clone();
+          data = await clonedRequest.json();
+        }
       } catch (bodyError) {
-        console.error('[KV Metadata] ERROR reading request body:', {
+        console.error('[KV Metadata] ❌ ERROR reading request body:', {
           error: bodyError.message,
           stack: bodyError.stack,
           name: bodyError.name,
           requestType: typeof request,
           hasJson: typeof request?.json === 'function',
           hasBody: !!request?.body,
+          bodyType: typeof request?.body,
+          requestKeys: Object.keys(request || {}),
         });
         throw new Error(`Không thể đọc request body: ${bodyError.message}`);
       }
