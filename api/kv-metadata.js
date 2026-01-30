@@ -42,6 +42,9 @@ async function getRedisClient() {
  * Helper function để gọi Upstash Redis REST API
  */
 async function redisGetUpstash(key) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  
   try {
     // Upstash REST API: GET command format
     // https://{region}-{database-name}-{id}.upstash.io/get/{key}
@@ -55,10 +58,10 @@ async function redisGetUpstash(key) {
       headers: {
         'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
       },
-      // Add timeout để tránh hang
-      signal: AbortSignal.timeout(10000), // 10s timeout để match với client
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId); // Cleanup timeout ngay khi có response
     const duration = Date.now() - startTime;
     console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
@@ -101,6 +104,7 @@ async function redisGetUpstash(key) {
     
     return null;
   } catch (error) {
+    clearTimeout(timeoutId); // Đảm bảo cleanup timeout trong catch
     console.error('[KV Metadata] Redis GET error:', error);
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
@@ -111,6 +115,9 @@ async function redisGetUpstash(key) {
 }
 
 async function redisSetUpstash(key, value) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  
   try {
     const valueStr = JSON.stringify(value);
     const valueSize = new Blob([valueStr]).size;
@@ -131,10 +138,10 @@ async function redisSetUpstash(key, value) {
         'Content-Type': 'text/plain', // Upstash expects text/plain, not application/json
       },
       body: valueStr, // Value trong body, không cần encode trong URL
-      // Add timeout để tránh hang
-      signal: AbortSignal.timeout(10000), // 10s timeout
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId); // Cleanup timeout ngay khi có response
     const duration = Date.now() - startTime;
     console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
 
@@ -155,6 +162,7 @@ async function redisSetUpstash(key, value) {
     const result = await response.json();
     return result;
   } catch (error) {
+    clearTimeout(timeoutId); // Đảm bảo cleanup timeout trong catch
     console.error('[KV Metadata] Redis SET error:', error);
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
@@ -214,6 +222,8 @@ async function redisSet(key, value) {
 }
 
 export default async function handler(request) {
+  const handlerEntryTime = Date.now();
+  
   // Kiểm tra Redis đã được setup chưa
   const hasRedisUrl = !!process.env.REDIS_URL;
   const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
@@ -225,6 +235,7 @@ export default async function handler(request) {
     hasUpstash,
     kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
     kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
+    timestamp: handlerEntryTime,
   });
   
   // Kiểm tra format của KV_REST_API_URL
@@ -272,14 +283,16 @@ export default async function handler(request) {
   }
 
   if (request.method === 'GET') {
+    const handlerStartTime = Date.now();
     try {
       console.log('[KV Metadata] GET request - Đang lấy metadata từ Redis...');
       
       const metadata = await redisGet(METADATA_KEY);
+      const handlerDuration = Date.now() - handlerStartTime;
       
       if (metadata && typeof metadata === 'object') {
-        console.log('[KV Metadata] Tìm thấy metadata trên Redis');
-        return new Response(
+        console.log(`[KV Metadata] Tìm thấy metadata trên Redis (handler duration: ${handlerDuration}ms)`);
+        const response = new Response(
           JSON.stringify(metadata),
           { 
             status: 200, 
@@ -289,9 +302,11 @@ export default async function handler(request) {
             } 
           }
         );
+        console.log(`[KV Metadata] Returning response với metadata (total handler time: ${Date.now() - handlerEntryTime}ms)`);
+        return response;
       } else {
-        console.log('[KV Metadata] Không có metadata trên Redis, trả về empty');
-        return new Response(
+        console.log(`[KV Metadata] Không có metadata trên Redis, trả về empty (handler duration: ${handlerDuration}ms)`);
+        const response = new Response(
           JSON.stringify({
             catalogs: [],
             files: [],
@@ -305,11 +320,14 @@ export default async function handler(request) {
             } 
           }
         );
+        console.log(`[KV Metadata] Returning response với empty data (total handler time: ${Date.now() - handlerEntryTime}ms)`);
+        return response;
       }
     } catch (error) {
-      console.error('[KV Metadata] Lỗi khi đọc:', error);
+      const handlerDuration = Date.now() - handlerStartTime;
+      console.error(`[KV Metadata] Lỗi khi đọc (handler duration: ${handlerDuration}ms):`, error);
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      return new Response(
+      const response = new Response(
         JSON.stringify({ 
           error: 'Không thể đọc metadata từ Redis',
           details: errorMessage
@@ -322,6 +340,8 @@ export default async function handler(request) {
           } 
         }
       );
+      console.log('[KV Metadata] Returning error response');
+      return response;
     }
   }
 
