@@ -138,35 +138,26 @@ export async function savePdf(file, catalog = null) {
     return savePdfLocal(file, catalog);
   }
 
-  // Thử upload lên Vercel Blob trước với timeout
+  // Thử upload lên Google Drive trước
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Tạo AbortController để timeout sau 55 giây (trước khi function timeout)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout
-
-    const response = await fetch('/api/upload-pdf', {
-      method: 'POST',
-      body: formData,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const result = await response.json();
-      const { id, name, url } = result;
+    // Kiểm tra xem có đăng nhập Google không
+    const googleDriveModule = await import('./services/googleDrive');
+    const { isLoggedIn, uploadPdfToDrive } = googleDriveModule;
+    
+    if (isLoggedIn && isLoggedIn()) {
+      console.log('[PDF Storage] Đang upload lên Google Drive...');
+      const result = await uploadPdfToDrive(file, 'root'); // Upload vào root folder
+      const { id, name, url, driveId } = result;
 
       // Cache metadata trong IndexedDB
       const record = {
-        id: url,
+        id: driveId || id,
         name,
         url,
         createdAt: Date.now(),
         isLocal: false,
-        catalog: catalog || null, // Thêm catalog
+        catalog: catalog || null,
+        driveId: driveId || id, // Lưu driveId để có thể download sau
       };
 
       const db = await openDB();
@@ -177,47 +168,19 @@ export async function savePdf(file, catalog = null) {
         req.onsuccess = () => {
           // Sync metadata lên cloud sau khi upload thành công
           syncMetadataToCloud().catch(() => {}); // Background sync, không block
-          resolve({ id: url, name, url, catalog: catalog || null });
+          resolve({ id: driveId || id, name, url, catalog: catalog || null });
         };
         req.onerror = () => reject(req.error);
         tx.oncomplete = () => db.close();
       });
     } else {
-      // API trả về lỗi, lấy chi tiết lỗi từ response
-      let errorMessage = 'Không thể upload PDF';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.details || errorMessage;
-      } catch (e) {
-        errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
-      }
-      
-      // Nếu là lỗi server (500), fallback về local
-      if (response.status >= 500) {
-        console.warn('API route lỗi server, dùng IndexedDB local mode:', errorMessage);
-        return savePdfLocal(file, catalog);
-      }
-      
-      // Nếu là lỗi client (400, 401, 403, etc.), throw error để hiển thị cho user
-      throw new Error(errorMessage);
+      console.log('[PDF Storage] Chưa đăng nhập Google, fallback về IndexedDB');
+      return savePdfLocal(file, catalog);
     }
-    } catch (error) {
-      // Kiểm tra xem có phải lỗi timeout hoặc abort không
-      if (error.name === 'AbortError' || error.message.includes('timeout') || error.message.includes('504')) {
-        console.warn('Upload timeout, dùng IndexedDB local mode:', error.message);
-        return savePdfLocal(file, catalog);
-      }
-      
-      // Kiểm tra xem có phải lỗi network không
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        // Lỗi network hoặc API không tồn tại, fallback về local
-        console.warn('Không thể kết nối API, dùng IndexedDB local mode:', error.message);
-        return savePdfLocal(file, catalog);
-      }
-      
-      // Nếu là lỗi từ API (đã được throw ở trên), re-throw để hiển thị cho user
-      throw error;
-    }
+  } catch (error) {
+    console.warn('[PDF Storage] Lỗi khi upload lên Google Drive, fallback về IndexedDB:', error.message);
+    return savePdfLocal(file, catalog);
+  }
 }
 
 /**
@@ -269,15 +232,31 @@ export async function getPdfData(id) {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(id);
-      req.onsuccess = () => {
+      req.onsuccess = async () => {
         const record = req.result;
         if (!record) {
           reject(new Error('PDF không tồn tại'));
           return;
         }
 
+        // Nếu có driveId (Google Drive), download từ Drive
+        if (record.driveId && !record.isLocal) {
+          try {
+            const { downloadPdfFile } = await import('./services/googleDrive');
+            const pdfData = await downloadPdfFile(record.driveId);
+            resolve(pdfData);
+          } catch (error) {
+            console.warn('Không thể download từ Google Drive, thử URL:', error.message);
+            // Fallback về URL nếu có
+            if (record.url) {
+              fetchPdfFromUrl(record.url).then(resolve).catch(reject);
+            } else {
+              reject(error);
+            }
+          }
+        }
         // Nếu có URL (cloud), fetch từ URL
-        if (record.url && !record.isLocal) {
+        else if (record.url && !record.isLocal) {
           fetchPdfFromUrl(record.url).then(resolve).catch(reject);
         } 
         // Nếu là local (có data trong IndexedDB), clone ArrayBuffer để tránh detached

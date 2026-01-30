@@ -6,7 +6,7 @@
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive';
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file';
 
 let tokenClient = null;
 let gapiLoaded = false;
@@ -508,6 +508,72 @@ export async function getFileInfo(fileId) {
     return response.result;
   } catch (error) {
     console.error('Error getting file info:', error);
+    throw error;
+  }
+}
+
+/**
+ * Upload PDF file lên Google Drive
+ * @param {File} file - File PDF cần upload
+ * @param {string} folderId - ID của folder trên Google Drive (optional, default: 'root')
+ * @returns {Promise<{id: string, name: string, url: string}>}
+ */
+export async function uploadPdfToDrive(file, folderId = 'root') {
+  if (!isLoggedIn()) {
+    throw new Error('Chưa đăng nhập Google');
+  }
+
+  if (!file || file.type !== 'application/pdf') {
+    throw new Error('File phải là PDF');
+  }
+
+  try {
+    const accessToken = window.gapi.client.getToken()?.access_token;
+    if (!accessToken) {
+      throw new Error('Không có access token. Vui lòng đăng nhập lại.');
+    }
+
+    // Tạo tên file unique với timestamp
+    const timestamp = Date.now();
+    const uniqueFileName = `${timestamp}-${file.name}`;
+
+    // Tạo metadata
+    const metadata = {
+      name: uniqueFileName,
+      parents: [folderId],
+      mimeType: 'application/pdf',
+    };
+
+    // Upload file lên Google Drive
+    const formData = new FormData();
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    formData.append('file', file);
+
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webContentLink,webViewLink,size,createdTime', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Google Drive API error: ${response.status}`);
+    }
+
+    const fileData = await response.json();
+
+    return {
+      id: fileData.id,
+      name: file.name,
+      url: fileData.webContentLink || fileData.webViewLink,
+      driveId: fileData.id,
+      uploadedAt: timestamp,
+      size: fileData.size,
+    };
+  } catch (error) {
+    console.error('Error uploading PDF to Drive:', error);
     throw error;
   }
 }

@@ -3,16 +3,18 @@
  * Switch giữa các storage options dễ dàng
  * 
  * Options:
- * - 'vercel-blob': Vercel Blob Storage (default)
+ * - 'vercel-kv': Vercel KV Storage (recommended) ⭐
+ * - 'vercel-blob': Vercel Blob Storage
  * - 'github': GitHub API Storage
  * - 'local': Local Storage only (IndexedDB + localStorage backup)
  */
 
 // Thay đổi giá trị này để switch storage option
+// 'vercel-kv': Vercel KV Storage - Low latency, free tier 30K ops/day (recommended) ⭐
 // 'vercel-blob': Vercel Blob Storage (cần BLOB_READ_WRITE_TOKEN)
 // 'github': GitHub API Storage (cần GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
 // 'local': Local Storage only - IndexedDB + localStorage backup (không cần config)
-const STORAGE_TYPE = 'github'; // 'vercel-blob' | 'github' | 'local'
+const STORAGE_TYPE = 'vercel-kv'; // 'vercel-kv' | 'vercel-blob' | 'github' | 'local'
 
 let metadataSyncModule = null;
 
@@ -22,6 +24,9 @@ async function getMetadataSyncModule() {
   }
 
   switch (STORAGE_TYPE) {
+    case 'vercel-kv':
+      metadataSyncModule = await import('./metadataSyncKV');
+      break;
     case 'github':
       metadataSyncModule = await import('./metadataSyncGitHub');
       break;
