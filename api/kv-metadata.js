@@ -356,35 +356,8 @@ export default async function handler(request) {
 
   if (request.method === 'POST') {
     try {
-      // Đảm bảo request là Request object và có thể đọc body
-      let data;
-      
-      // Kiểm tra xem request có phải là Request object không
-      if (request instanceof Request) {
-        // Request object chuẩn - dùng json() method
-        try {
-          data = await request.json();
-        } catch (jsonError) {
-          // Nếu json() fail, thử đọc text và parse
-          console.warn('[KV Metadata] request.json() failed, trying text():', jsonError.message);
-          const bodyText = await request.text();
-          data = JSON.parse(bodyText);
-        }
-      } else if (typeof request.json === 'function') {
-        // Có method json() nhưng không phải Request object
-        data = await request.json();
-      } else if (request.body) {
-        // Fallback: đọc từ body property
-        const bodyText = typeof request.body === 'string' 
-          ? request.body 
-          : await new Response(request.body).text();
-        data = JSON.parse(bodyText);
-      } else {
-        // Fallback cuối cùng: wrap request trong Request object mới
-        const requestObj = new Request(request);
-        data = await requestObj.json();
-      }
-      
+      // Đọc body từ request - giống như các API khác
+      const data = await request.json();
       const { catalogs, files, lastSync } = data;
 
       const metadata = {
