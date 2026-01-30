@@ -19,7 +19,7 @@ export async function loadMetadataFromCloud() {
     console.log('[Metadata Sync KV] Đang load metadata từ Vercel KV...');
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // Giảm xuống 8s để tránh timeout
     
     try {
       const response = await fetch('/api/kv-metadata', {

@@ -46,5 +46,16 @@ export default defineConfig({
         return false; // Suppress act() warnings
       }
     },
+    // Handle unhandled errors từ webidl-conversions/whatwg-url
+    onUnhandledRejection: (reason, promise) => {
+      // Ignore errors từ webidl-conversions trong test environment
+      if (reason?.message?.includes('webidl-conversions') || 
+          reason?.message?.includes('whatwg-url') ||
+          reason?.stack?.includes('webidl-conversions') ||
+          reason?.stack?.includes('whatwg-url')) {
+        return; // Ignore these errors
+      }
+      throw reason; // Re-throw other errors
+    },
   },
 })
