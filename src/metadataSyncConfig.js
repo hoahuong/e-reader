@@ -26,6 +26,9 @@ async function getMetadataSyncModule() {
   }
 
   switch (STORAGE_TYPE) {
+    case 'supabase':
+      metadataSyncModule = await import('./metadataSyncSupabase');
+      break;
     case 'vercel-kv':
       metadataSyncModule = await import('./metadataSyncKV');
       break;
