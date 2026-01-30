@@ -541,11 +541,17 @@ export default async function handler(request) {
     try {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
       
-      // Đọc body từ request
-      // request.json() là cách đúng (Web Standard Request API)
-      // QUAN TRỌNG: Request body chỉ có thể đọc 1 lần (bodyUsed property)
+      // Đọc body từ request - QUAN TRỌNG: Xử lý cả Web Standard Request và Node.js req object
       console.log('[KV Metadata] Reading request body...');
       console.log('[KV Metadata] Body used before parsing:', request?.bodyUsed);
+      console.log('[KV Metadata] Request type check:', {
+        hasJson: typeof request?.json === 'function',
+        hasBody: !!request?.body,
+        bodyType: typeof request?.body,
+        isRequest: request instanceof Request,
+        constructor: request?.constructor?.name,
+        keys: Object.keys(request || {}).slice(0, 10),
+      });
       
       let data;
       try {
@@ -555,24 +561,75 @@ export default async function handler(request) {
           throw new Error('Request body đã bị consumed trước đó');
         }
         
-        // request.json() là cách đúng - giống save-metadata.js và các API khác
-        // Wrap trong Promise.race để có timeout protection (3s)
-        const jsonPromise = request.json();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
-        );
-        data = await Promise.race([jsonPromise, timeoutPromise]);
-        console.log('[KV Metadata] Request body parsed successfully');
-        console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
+        // CÁCH 1: Thử dùng request.json() nếu có (Web Standard Request API)
+        if (typeof request?.json === 'function') {
+          console.log('[KV Metadata] Using request.json() (Web Standard Request API)...');
+          const jsonPromise = request.json();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
+          );
+          data = await Promise.race([jsonPromise, timeoutPromise]);
+          console.log('[KV Metadata] Request body parsed successfully via request.json()');
+          console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
+        }
+        // CÁCH 2: Thử dùng request.body nếu là object (Vercel Node.js helper)
+        else if (request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
+          console.log('[KV Metadata] Using request.body (Vercel Node.js helper)...');
+          data = request.body;
+          console.log('[KV Metadata] Request body parsed successfully via request.body');
+        }
+        // CÁCH 3: Thử đọc từ body stream
+        else if (request?.body) {
+          console.log('[KV Metadata] Reading from request.body stream...');
+          if (typeof request.body === 'string') {
+            data = JSON.parse(request.body);
+            console.log('[KV Metadata] Request body parsed successfully from string');
+          } else if (request.body instanceof ReadableStream) {
+            console.log('[KV Metadata] Reading from ReadableStream...');
+            const reader = request.body.getReader();
+            const chunks = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+            }
+            const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
+            data = JSON.parse(bodyText);
+            console.log('[KV Metadata] Request body parsed successfully from ReadableStream');
+          } else {
+            throw new Error(`Không thể đọc request body: body type không được hỗ trợ (${typeof request.body})`);
+          }
+        }
+        // CÁCH 4: Thử wrap trong Request object mới
+        else {
+          console.log('[KV Metadata] Trying to create new Request object...');
+          try {
+            const newRequest = new Request(request.url || 'http://localhost', {
+              method: 'POST',
+              body: request.body,
+              headers: request.headers,
+            });
+            data = await newRequest.json();
+            console.log('[KV Metadata] Request body parsed successfully via new Request object');
+          } catch (wrapError) {
+            console.error('[KV Metadata] Failed to wrap request:', wrapError.message);
+            throw new Error(`Không thể đọc request body: không có cách nào để parse (json: ${typeof request?.json}, body: ${typeof request?.body})`);
+          }
+        }
       } catch (parseError) {
         // Log chi tiết để debug
         console.error('[KV Metadata] ❌ Error parsing request body:', {
           error: parseError.message,
           name: parseError.name,
-          cause: parseError.cause, // undefined nếu là client abort
+          cause: parseError.cause,
           bodyUsed: request?.bodyUsed,
           isAbortError: parseError.name === 'AbortError',
-          stack: parseError.stack?.split('\n').slice(0, 5).join('\n'),
+          requestType: typeof request,
+          hasJson: typeof request?.json === 'function',
+          hasBody: !!request?.body,
+          bodyType: typeof request?.body,
+          requestKeys: Object.keys(request || {}).slice(0, 20),
+          stack: parseError.stack?.split('\n').slice(0, 10).join('\n'),
         });
         
         // Nếu là AbortError từ client, không phải lỗi server
