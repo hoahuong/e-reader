@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import App from '../App';
 
@@ -53,51 +53,65 @@ describe('Integration Tests - Bug Detection', () => {
     it('should NOT throw error when component renders', () => {
       // Component should render without throwing error about uploadDriveFolderId
       expect(() => {
+        act(() => {
+          render(
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          );
+        });
+      }).not.toThrow();
+    });
+
+    it('should pass uploadDriveFolderId props correctly', async () => {
+      await act(async () => {
         render(
           <BrowserRouter>
             <App />
           </BrowserRouter>
         );
-      }).not.toThrow();
-    });
-
-    it('should pass uploadDriveFolderId props correctly', async () => {
-      render(
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      );
+      });
 
       // Component should render without errors
-      expect(screen.getByText(/📚/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/📚/)).toBeInTheDocument();
+      });
     });
   });
 
   describe('Bug Detection: localStorage fallback', () => {
-    it('should handle missing uploadDriveFolderId gracefully', () => {
+    it('should handle missing uploadDriveFolderId gracefully', async () => {
       localStorage.setItem('pdf-upload-folder-id', 'saved-folder-id');
       
-      render(
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      );
+      await act(async () => {
+        render(
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        );
+      });
 
       // Should not throw error
-      expect(screen.getByText(/📚/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/📚/)).toBeInTheDocument();
+      });
     });
 
-    it('should use root as default when no folder selected', () => {
+    it('should use root as default when no folder selected', async () => {
       localStorage.removeItem('pdf-upload-folder-id');
       
-      render(
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      );
+      await act(async () => {
+        render(
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        );
+      });
 
       // Should render without errors
-      expect(screen.getByText(/📚/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/📚/)).toBeInTheDocument();
+      });
     });
   });
 
@@ -126,14 +140,18 @@ describe('Integration Tests - Bug Detection', () => {
       const { savePdf } = await import('../pdfStorage');
       savePdf.mockRejectedValueOnce(new Error('Upload failed'));
 
-      render(
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      );
+      await act(async () => {
+        render(
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        );
+      });
 
       // Should not crash on error
-      expect(screen.getByText(/📚/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/📚/)).toBeInTheDocument();
+      });
     });
   });
 });

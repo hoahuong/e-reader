@@ -14,21 +14,33 @@ export class BugDetector {
   detectBugs() {
     const bugs = [];
 
-    // Bug 1: Check for undefined variables
-    if (typeof uploadDriveFolderId === 'undefined' && window.location.pathname.includes('/')) {
-      bugs.push({
-        id: 'BUG_001',
-        severity: 'high',
-        type: 'undefined_variable',
-        message: 'uploadDriveFolderId is not defined',
-        component: 'LanguageRoutes',
-        fix: 'Add uploadDriveFolderId to component props',
-      });
+    // Chỉ chạy detection trong browser environment
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      // Trong Node.js environment, return empty bugs array
+      return bugs;
+    }
+
+    // Bug 1: Check for undefined variables (chỉ trong browser)
+    try {
+      if (typeof uploadDriveFolderId === 'undefined' && window.location.pathname.includes('/')) {
+        bugs.push({
+          id: 'BUG_001',
+          severity: 'high',
+          type: 'undefined_variable',
+          message: 'uploadDriveFolderId is not defined',
+          component: 'LanguageRoutes',
+          fix: 'Add uploadDriveFolderId to component props',
+        });
+      }
+    } catch (e) {
+      // Ignore errors in Node.js environment
     }
 
     // Bug 2: Check for localStorage errors
     try {
-      localStorage.getItem('test');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.getItem('test');
+      }
     } catch (e) {
       bugs.push({
         id: 'BUG_002',
@@ -39,16 +51,22 @@ export class BugDetector {
       });
     }
 
-    // Bug 3: Check for missing error handlers
-    const errorHandlers = document.querySelectorAll('[role="alert"]');
-    if (errorHandlers.length === 0) {
-      bugs.push({
-        id: 'BUG_003',
-        severity: 'low',
-        type: 'missing_error_handler',
-        message: 'No error handlers found',
-        fix: 'Add error handling UI',
-      });
+    // Bug 3: Check for missing error handlers (chỉ trong browser)
+    try {
+      if (typeof document !== 'undefined') {
+        const errorHandlers = document.querySelectorAll('[role="alert"]');
+        if (errorHandlers.length === 0) {
+          bugs.push({
+            id: 'BUG_003',
+            severity: 'low',
+            type: 'missing_error_handler',
+            message: 'No error handlers found',
+            fix: 'Add error handling UI',
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore errors in Node.js environment
     }
 
     return bugs;
@@ -58,6 +76,11 @@ export class BugDetector {
    * Monitor runtime errors
    */
   setupErrorMonitoring() {
+    // Chỉ setup trong browser environment
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     window.addEventListener('error', (event) => {
       this.reportBug({
         id: `RUNTIME_${Date.now()}`,
@@ -86,12 +109,20 @@ export class BugDetector {
    * Report bug
    */
   reportBug(bug) {
-    this.detectedBugs.push({
+    const bugReport = {
       ...bug,
       timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-    });
+    };
+
+    // Chỉ thêm browser-specific info nếu có
+    if (typeof navigator !== 'undefined') {
+      bugReport.userAgent = navigator.userAgent;
+    }
+    if (typeof window !== 'undefined' && window.location) {
+      bugReport.url = window.location.href;
+    }
+
+    this.detectedBugs.push(bugReport);
 
     // Notify listeners
     this.listeners.forEach(listener => listener(bug));
