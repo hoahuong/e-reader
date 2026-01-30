@@ -42,9 +42,13 @@ async function getRedisClient() {
  * Helper function để gọi Upstash Redis REST API
  */
 async function redisGetUpstash(key) {
+  const getStartTime = Date.now();
+  console.log(`[KV Metadata] 🔵 redisGetUpstash START - key: ${key}, time: ${new Date().toISOString()}`);
+  
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.log('[KV Metadata] Aborting GET request due to timeout');
+    const elapsed = Date.now() - getStartTime;
+    console.error(`[KV Metadata] ⚠️ GET request TIMEOUT sau ${elapsed}ms - aborting...`);
     controller.abort();
   }, 10000); // 10s timeout
   
@@ -55,39 +59,68 @@ async function redisGetUpstash(key) {
     console.log(`[KV Metadata] GET request to: ${url.substring(0, 50)}...`);
     console.log(`[KV Metadata] Token present: ${!!process.env.KV_REST_API_TOKEN}`);
     
-    const startTime = Date.now();
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
-      },
-      signal: controller.signal,
-    });
+    const fetchStartTime = Date.now();
+    console.log(`[KV Metadata] 🔵 About to call fetch()...`);
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.KV_REST_API_TOKEN}`,
+        },
+        signal: controller.signal,
+      });
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`[KV Metadata] ✅ Fetch completed in ${fetchDuration}ms`);
+    } catch (fetchError) {
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.error(`[KV Metadata] ❌ Fetch failed after ${fetchDuration}ms:`, {
+        error: fetchError.message,
+        name: fetchError.name,
+        cause: fetchError.cause,
+      });
+      throw fetchError;
+    }
     
     // Cleanup timeout ngay khi có response
     clearTimeout(timeoutId);
-    const duration = Date.now() - startTime;
-    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
+    const duration = Date.now() - getStartTime;
+    console.log(`[KV Metadata] GET response status: ${response.status}, ok: ${response.ok}, total duration: ${duration}ms`);
 
     if (!response.ok) {
       if (response.status === 404) {
-        // Consume body để đảm bảo connection được đóng
-        await response.text().catch(() => null);
+        console.log(`[KV Metadata] 🔵 404 - About to consume body...`);
+        const consumeStart = Date.now();
+        await response.text().catch((e) => {
+          console.error(`[KV Metadata] Error consuming 404 body:`, e.message);
+          return null;
+        });
+        console.log(`[KV Metadata] ✅ Body consumed in ${Date.now() - consumeStart}ms`);
         return null;
       }
+      console.log(`[KV Metadata] 🔵 Error response - About to read error text...`);
+      const errorTextStart = Date.now();
       const errorText = await response.text().catch(() => 'Unknown error');
+      console.log(`[KV Metadata] ✅ Error text read in ${Date.now() - errorTextStart}ms`);
       throw new Error(`Redis GET failed: ${response.status} - ${errorText}`);
     }
 
     // Check content-type
     const contentType = response.headers.get('content-type') || '';
+    console.log(`[KV Metadata] Content-Type: ${contentType}`);
     if (!contentType.includes('application/json')) {
+      console.log(`[KV Metadata] 🔵 Non-JSON response - About to read text...`);
+      const textStart = Date.now();
       const text = await response.text();
+      console.log(`[KV Metadata] ✅ Text read in ${Date.now() - textStart}ms`);
       console.error('[KV Metadata] Response không phải JSON:', text.substring(0, 200));
       throw new Error('Invalid response format from Redis API');
     }
 
+    console.log(`[KV Metadata] 🔵 About to parse JSON...`);
+    const jsonStart = Date.now();
     const data = await response.json();
+    console.log(`[KV Metadata] ✅ JSON parsed in ${Date.now() - jsonStart}ms`);
     
     // Handle different Upstash response formats
     if (data && typeof data === 'object') {
@@ -108,13 +141,16 @@ async function redisGetUpstash(key) {
       return data;
     }
     
+    const totalDuration = Date.now() - getStartTime;
+    console.log(`[KV Metadata] ✅ redisGetUpstash COMPLETE in ${totalDuration}ms`);
     return null;
   } catch (error) {
     // Đảm bảo cleanup timeout trong catch
     clearTimeout(timeoutId);
-    console.error('[KV Metadata] Redis GET error:', {
+    const totalDuration = Date.now() - getStartTime;
+    console.error(`[KV Metadata] ❌ redisGetUpstash ERROR after ${totalDuration}ms:`, {
       error: error.message,
-      stack: error.stack,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
       name: error.name,
       cause: error.cause,
       url: `${process.env.KV_REST_API_URL}/get/${key}`,
@@ -122,13 +158,16 @@ async function redisGetUpstash(key) {
     });
     // Handle timeout và network errors
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error('Redis request timeout - có thể do network hoặc Redis không khả dụng');
+      throw new Error(`Redis GET request timeout sau ${totalDuration}ms - có thể do network hoặc Redis không khả dụng`);
     }
     throw error;
   }
 }
 
 async function redisSetUpstash(key, value) {
+  const setStartTime = Date.now();
+  console.log(`[KV Metadata] 🟢 redisSetUpstash START - key: ${key}, time: ${new Date().toISOString()}`);
+  
   // Kiểm tra env vars trước
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     throw new Error('KV_REST_API_URL hoặc KV_REST_API_TOKEN chưa được set');
@@ -145,12 +184,17 @@ async function redisSetUpstash(key, value) {
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.error('[KV Metadata] ⚠️ SET request TIMEOUT sau 5s - có thể do connection issue');
+    const elapsed = Date.now() - setStartTime;
+    console.error(`[KV Metadata] ⚠️ SET request TIMEOUT sau ${elapsed}ms - aborting...`);
     controller.abort();
   }, 5000); // Giảm xuống 5s để phát hiện sớm connection issues
   
   try {
+    const stringifyStart = Date.now();
     const valueStr = JSON.stringify(value);
+    const stringifyDuration = Date.now() - stringifyStart;
+    console.log(`[KV Metadata] JSON.stringify took ${stringifyDuration}ms`);
+    
     const valueSize = new Blob([valueStr]).size;
     console.log(`[KV Metadata] SET request - key: ${key}, value size: ${valueSize} bytes (${(valueSize/1024).toFixed(2)} KB)`);
     
@@ -169,8 +213,8 @@ async function redisSetUpstash(key, value) {
     };
     console.log('[KV Metadata] Request details:', requestDetails);
     
-    const startTime = Date.now();
-    console.log(`[KV Metadata] ⏱️ Starting fetch at ${new Date().toISOString()}`);
+    const fetchStartTime = Date.now();
+    console.log(`[KV Metadata] 🟢 About to call fetch()...`);
     
     let response;
     try {
@@ -183,9 +227,10 @@ async function redisSetUpstash(key, value) {
         body: valueStr,
         signal: controller.signal,
       });
-      console.log(`[KV Metadata] ✅ Fetch completed in ${Date.now() - startTime}ms`);
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`[KV Metadata] ✅ Fetch completed in ${fetchDuration}ms`);
     } catch (fetchError) {
-      const fetchDuration = Date.now() - startTime;
+      const fetchDuration = Date.now() - fetchStartTime;
       console.error(`[KV Metadata] ❌ Fetch failed after ${fetchDuration}ms:`, {
         error: fetchError.message,
         name: fetchError.name,
@@ -196,8 +241,8 @@ async function redisSetUpstash(key, value) {
     
     // Cleanup timeout ngay khi có response
     clearTimeout(timeoutId);
-    const duration = Date.now() - startTime;
-    console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, duration: ${duration}ms`);
+    const duration = Date.now() - setStartTime;
+    console.log(`[KV Metadata] SET response status: ${response.status}, ok: ${response.ok}, total duration: ${duration}ms`);
     
     // Log response headers để debug
     console.log('[KV Metadata] Response headers:', {
@@ -208,7 +253,13 @@ async function redisSetUpstash(key, value) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
+      console.log(`[KV Metadata] 🟢 Error response - About to read error text...`);
+      const errorTextStart = Date.now();
+      const errorText = await response.text().catch((e) => {
+        console.error(`[KV Metadata] Error reading error text:`, e.message);
+        return 'Unknown error';
+      });
+      console.log(`[KV Metadata] ✅ Error text read in ${Date.now() - errorTextStart}ms`);
       console.error(`[KV Metadata] ❌ Redis SET failed: ${response.status} - ${errorText.substring(0, 500)}`);
       
       // Log chi tiết về error response
@@ -228,17 +279,26 @@ async function redisSetUpstash(key, value) {
     console.log(`[KV Metadata] Response content-type: ${contentType}`);
     
     if (!contentType.includes('application/json')) {
+      console.log(`[KV Metadata] 🟢 Non-JSON response - About to read text...`);
+      const textStart = Date.now();
       const text = await response.text();
+      console.log(`[KV Metadata] ✅ Text read in ${Date.now() - textStart}ms`);
       console.error('[KV Metadata] ⚠️ Response không phải JSON:', text.substring(0, 500));
       throw new Error(`Invalid response format from Redis SET API: ${contentType} - ${text.substring(0, 100)}`);
     }
 
+    console.log(`[KV Metadata] 🟢 About to parse JSON...`);
+    const jsonStart = Date.now();
     const result = await response.json();
+    console.log(`[KV Metadata] ✅ JSON parsed in ${Date.now() - jsonStart}ms`);
+    const totalDuration = Date.now() - setStartTime;
+    console.log(`[KV Metadata] ✅ redisSetUpstash COMPLETE in ${totalDuration}ms`);
     console.log(`[KV Metadata] ✅ SET thành công:`, result);
     return result;
   } catch (error) {
     // Đảm bảo cleanup timeout trong catch
     clearTimeout(timeoutId);
+    const totalDuration = Date.now() - setStartTime;
     
     // Phân loại error để debug dễ hơn
     const errorInfo = {
@@ -250,13 +310,15 @@ async function redisSetUpstash(key, value) {
       tokenLength: process.env.KV_REST_API_TOKEN?.length || 0,
       valueSize: valueSize,
       valueSizeKB: (valueSize / 1024).toFixed(2),
+      duration: totalDuration,
     };
     
-    console.error('[KV Metadata] ❌ Redis SET error:', errorInfo);
+    console.error(`[KV Metadata] ❌ redisSetUpstash ERROR after ${totalDuration}ms:`, errorInfo);
+    console.error(`[KV Metadata] Error stack:`, error.stack?.split('\n').slice(0, 5).join('\n'));
     
     // Handle timeout và network errors với message rõ ràng hơn
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error(`Redis SET request timeout sau 5s - Kiểm tra: 1) Connection đến Upstash, 2) Token có đúng không, 3) URL format có đúng không`);
+      throw new Error(`Redis SET request timeout sau ${totalDuration}ms - Kiểm tra: 1) Connection đến Upstash, 2) Token có đúng không, 3) URL format có đúng không`);
     }
     
     // Handle network errors
@@ -406,9 +468,14 @@ export default async function handler(request) {
   if (request.method === 'GET') {
     const handlerStartTime = Date.now();
     try {
-      console.log('[KV Metadata] GET request - Đang lấy metadata từ Redis...');
+      console.log('[KV Metadata] 🔵 GET request - Đang lấy metadata từ Redis...');
+      console.log(`[KV Metadata] About to call redisGet()...`);
       
+      const redisGetStart = Date.now();
       const metadata = await redisGet(METADATA_KEY);
+      const redisGetDuration = Date.now() - redisGetStart;
+      console.log(`[KV Metadata] ✅ redisGet() completed in ${redisGetDuration}ms`);
+      
       const handlerDuration = Date.now() - handlerStartTime;
       
       if (metadata && typeof metadata === 'object') {
@@ -533,15 +600,21 @@ export default async function handler(request) {
       };
 
       // Log payload size để debug
+      const stringifyStart = Date.now();
       const payloadSize = JSON.stringify(metadata).length;
+      const stringifyDuration = Date.now() - stringifyStart;
       const payloadSizeKB = (payloadSize / 1024).toFixed(2);
-      console.log(`[KV Metadata] Đang lưu metadata lên Redis... (size: ${payloadSizeKB} KB, ${metadata.catalogs.length} catalogs, ${metadata.files.length} files)`);
+      console.log(`[KV Metadata] Payload size: ${payloadSizeKB} KB, stringify took ${stringifyDuration}ms`);
+      console.log(`[KV Metadata] 🟢 Đang lưu metadata lên Redis... (${metadata.catalogs.length} catalogs, ${metadata.files.length} files)`);
+      console.log(`[KV Metadata] About to call redisSet()...`);
       
       const redisSetStartTime = Date.now();
       await redisSet(METADATA_KEY, metadata);
       const redisSetDuration = Date.now() - redisSetStartTime;
+      console.log(`[KV Metadata] ✅ redisSet() completed in ${redisSetDuration}ms`);
       
-      console.log(`[KV Metadata] Lưu thành công (Redis SET duration: ${redisSetDuration}ms, total POST duration: ${Date.now() - postStartTime}ms)`);
+      const totalPostDuration = Date.now() - postStartTime;
+      console.log(`[KV Metadata] ✅ Lưu thành công (Redis SET: ${redisSetDuration}ms, total POST: ${totalPostDuration}ms)`);
       return new Response(
         JSON.stringify({
           success: true,
