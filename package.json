@@ -17,7 +17,8 @@
     "test:integration": "vitest run src/test/integration.test.jsx",
     "test:automated": "node scripts/run-automated-tests.js",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:kv": "node scripts/test-kv-connection.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.1",
