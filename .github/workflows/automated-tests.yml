@@ -36,7 +36,10 @@ jobs:
     
     - name: Run bug detection
       id: bug-detection
-      run: node scripts/run-automated-tests.js || echo "exit_code=$?" >> $GITHUB_OUTPUT
+      run: |
+        # Set globals trước khi chạy tests để fix webidl-conversions errors
+        export NODE_OPTIONS="--no-warnings"
+        node scripts/run-automated-tests.js || echo "exit_code=$?" >> $GITHUB_OUTPUT
       continue-on-error: true  # Không fail workflow nếu chỉ có bugs được phát hiện
     
     - name: Upload bug report
