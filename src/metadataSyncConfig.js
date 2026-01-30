@@ -19,6 +19,7 @@
 // 
 // Lưu ý: Nếu chọn 'supabase' nhưng chưa setup, app sẽ tự động fallback về 'local'
 const STORAGE_TYPE = 'supabase'; // 'supabase' | 'vercel-kv' | 'vercel-blob' | 'github' | 'local'
+// Updated: 2026-01-29 - Switched to Supabase for reliable metadata storage
 
 let metadataSyncModule = null;
 
