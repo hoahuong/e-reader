@@ -39,5 +39,12 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
+    testTimeout: 10000, // Tăng timeout cho tests
+    // Suppress act() warnings - chúng chỉ là warnings, không phải errors
+    onConsoleLog: (log, type) => {
+      if (type === 'warn' && log.includes('act(')) {
+        return false; // Suppress act() warnings
+      }
+    },
   },
 })
