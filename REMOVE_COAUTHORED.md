@@ -2,7 +2,7 @@
 
 ## Vấn đề
 
-Một số commits có trailer `Co-authored-by: Cursor <cursoragent@cursor.com>` được tự động thêm vào.
+Đã xóa hoàn toàn trailer `Co-authored-by: Cursor <cursoragent@cursor.com>` khỏi git history.
 
 ## Giải pháp
 
