@@ -356,7 +356,31 @@ export default async function handler(request) {
 
   if (request.method === 'POST') {
     try {
-      const data = await request.json();
+      console.log('[KV Metadata] POST request - request type:', typeof request);
+      console.log('[KV Metadata] POST request - has json method:', typeof request.json);
+      console.log('[KV Metadata] POST request - has body:', !!request.body);
+      
+      // Đảm bảo request có method json() hoặc đọc body theo cách khác
+      let data;
+      if (typeof request.json === 'function') {
+        data = await request.json();
+      } else if (request.body) {
+        // Fallback: đọc từ body nếu request.json() không tồn tại
+        const bodyText = typeof request.body === 'string' 
+          ? request.body 
+          : await new Response(request.body).text();
+        data = JSON.parse(bodyText);
+      } else {
+        // Fallback cuối cùng: thử đọc từ request như một stream
+        const bodyText = await new Response(request).text();
+        data = JSON.parse(bodyText);
+      }
+      
+      console.log('[KV Metadata] POST request - parsed data:', {
+        catalogsCount: data?.catalogs?.length || 0,
+        filesCount: data?.files?.length || 0,
+      });
+      
       const { catalogs, files, lastSync } = data;
 
       const metadata = {
