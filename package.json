@@ -21,7 +21,8 @@
     "test:kv": "node scripts/test-kv-connection.js",
     "test:api:local": "node scripts/test-api-local.js",
     "test:api:prod": "node scripts/test-api-production.js",
-    "test:upstash:direct": "node scripts/test-upstash-direct.js"
+    "test:upstash:direct": "node scripts/test-upstash-direct.js",
+    "test:handler:direct": "node scripts/test-handler-direct.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.1",
