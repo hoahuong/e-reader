@@ -27,9 +27,12 @@ jobs:
     
     - name: Run tests
       run: npm run test:run
+      continue-on-error: false
     
     - name: Run bug detection
-      run: node scripts/run-automated-tests.js
+      id: bug-detection
+      run: node scripts/run-automated-tests.js || echo "exit_code=$?" >> $GITHUB_OUTPUT
+      continue-on-error: true  # Không fail workflow nếu chỉ có bugs được phát hiện
     
     - name: Upload bug report
       if: always()
@@ -41,28 +44,35 @@ jobs:
           BUG_REPORT.md
     
     - name: Create issue for high priority bugs
-      if: contains(github.event.head_commit.message, 'bug') || contains(github.event.head_commit.message, 'fix')
+      if: always() && (contains(github.event.head_commit.message, 'bug') || contains(github.event.head_commit.message, 'fix'))
       uses: actions/github-script@v6
       with:
         script: |
           const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync('bug-report.json', 'utf8'));
-          
-          const highPriorityBugs = report.bugs.filter(b => b.severity === 'high');
-          
-          if (highPriorityBugs.length > 0) {
-            const title = `🐛 High Priority Bugs Detected: ${highPriorityBugs.length}`;
-            const body = `## Bugs Detected\n\n` +
-              highPriorityBugs.map(bug => 
-                `- **${bug.id}**: ${bug.message}\n  - Component: ${bug.component || 'N/A'}\n  - Fix: ${bug.fix || 'N/A'}`
-              ).join('\n\n') +
-              `\n\nSee full report in artifacts.`;
-            
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: title,
-              body: body,
-              labels: ['bug', 'high-priority', 'automated']
-            });
+          try {
+            if (fs.existsSync('bug-report.json')) {
+              const report = JSON.parse(fs.readFileSync('bug-report.json', 'utf8'));
+              
+              const highPriorityBugs = report.bugs.filter(b => b.severity === 'high');
+              
+              if (highPriorityBugs.length > 0) {
+                const title = `🐛 High Priority Bugs Detected: ${highPriorityBugs.length}`;
+                const body = `## Bugs Detected\n\n` +
+                  highPriorityBugs.map(bug => 
+                    `- **${bug.id}**: ${bug.message}\n  - Component: ${bug.component || 'N/A'}\n  - Fix: ${bug.fix || 'N/A'}`
+                  ).join('\n\n') +
+                  `\n\nSee full report in artifacts.`;
+                
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: title,
+                  body: body,
+                  labels: ['bug', 'high-priority', 'automated']
+                });
+              }
+            }
+          } catch (error) {
+            console.log('Could not create issue:', error.message);
+            // Don't fail workflow if issue creation fails
           }

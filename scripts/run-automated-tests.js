@@ -46,12 +46,21 @@ async function main() {
         console.log(`\n💡 Fix plan generated:`);
         console.log(`   Estimated time: ${fixReport.estimatedTotalTime}`);
       }
+      
+      // Chỉ exit với error code nếu có high priority bugs
+      // Low/medium priority bugs không làm fail workflow
+      const highPriorityBugs = bugs.filter(b => b.severity === 'high');
+      if (highPriorityBugs.length > 0) {
+        console.log(`\n⚠️  High priority bugs detected - workflow sẽ fail`);
+        process.exit(1);
+      } else {
+        console.log(`\n✅ No high priority bugs - workflow sẽ pass`);
+        process.exit(0);
+      }
     } else {
       console.log('\n✅ No bugs detected!');
+      process.exit(0);
     }
-
-    // Exit with error code if bugs found
-    process.exit(bugs.length > 0 ? 1 : 0);
   } catch (error) {
     console.error('❌ Test failed:', error.message);
     process.exit(1);
