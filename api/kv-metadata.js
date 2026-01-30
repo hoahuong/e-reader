@@ -318,35 +318,40 @@ async function redisSet(key, value) {
 }
 
 export default async function handler(request) {
+  // Log ngay đầu function để verify function được gọi
+  console.log('[KV Metadata] ========== HANDLER START ==========');
+  console.log('[KV Metadata] Handler entry time:', new Date().toISOString());
+  
   const handlerEntryTime = Date.now();
   
-  // Kiểm tra Redis đã được setup chưa
-  const hasRedisUrl = !!process.env.REDIS_URL;
-  const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+  try {
+    // Kiểm tra Redis đã được setup chưa
+    const hasRedisUrl = !!process.env.REDIS_URL;
+    const hasUpstash = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
-  // Debug logging chi tiết để điều tra
-  console.log('[KV Metadata] Handler called:', {
-    method: request.method,
-    hasRedisUrl,
-    hasUpstash,
-    kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
-    kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
-    timestamp: handlerEntryTime,
-  });
-  
-  // Debug request object properties
-  console.log('[KV Metadata] Request object debug:', {
-    type: typeof request,
-    constructor: request?.constructor?.name,
-    isRequest: request instanceof Request,
-    hasJson: typeof request?.json === 'function',
-    hasText: typeof request?.text === 'function',
-    hasBody: !!request?.body,
-    bodyType: typeof request?.body,
-    method: request?.method,
-    url: request?.url,
-    headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
-  });
+    // Debug logging chi tiết để điều tra
+    console.log('[KV Metadata] Handler called:', {
+      method: request.method,
+      hasRedisUrl,
+      hasUpstash,
+      kvUrl: process.env.KV_REST_API_URL ? `${process.env.KV_REST_API_URL.substring(0, 30)}...` : 'NOT SET',
+      kvToken: process.env.KV_REST_API_TOKEN ? 'SET' : 'NOT SET',
+      timestamp: handlerEntryTime,
+    });
+    
+    // Debug request object properties
+    console.log('[KV Metadata] Request object debug:', {
+      type: typeof request,
+      constructor: request?.constructor?.name,
+      isRequest: request instanceof Request,
+      hasJson: typeof request?.json === 'function',
+      hasText: typeof request?.text === 'function',
+      hasBody: !!request?.body,
+      bodyType: typeof request?.body,
+      method: request?.method,
+      url: request?.url,
+      headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
+    });
   
   // Kiểm tra format của KV_REST_API_URL
   if (process.env.KV_REST_API_URL) {
@@ -599,8 +604,32 @@ export default async function handler(request) {
     }
   }
 
-  return new Response(
-    JSON.stringify({ error: 'Method not allowed' }),
-    { status: 405, headers: { 'Content-Type': 'application/json' } }
-  );
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (handlerError) {
+    // Catch mọi lỗi không được handle
+    console.error('[KV Metadata] ❌ UNHANDLED ERROR trong handler:', {
+      error: handlerError.message,
+      stack: handlerError.stack,
+      name: handlerError.name,
+      handlerDuration: Date.now() - handlerEntryTime,
+    });
+    
+    return new Response(
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: handlerError.message,
+        debug: {
+          errorName: handlerError.name,
+          handlerDuration: Date.now() - handlerEntryTime,
+        }
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  } finally {
+    console.log('[KV Metadata] ========== HANDLER END ==========');
+    console.log('[KV Metadata] Total handler duration:', Date.now() - handlerEntryTime, 'ms');
+  }
 }

@@ -18,7 +18,10 @@
     "test:automated": "node scripts/run-automated-tests.js",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
-    "test:kv": "node scripts/test-kv-connection.js"
+    "test:kv": "node scripts/test-kv-connection.js",
+    "test:api:local": "node scripts/test-api-local.js",
+    "test:api:prod": "node scripts/test-api-production.js",
+    "test:upstash:direct": "node scripts/test-upstash-direct.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.1",
