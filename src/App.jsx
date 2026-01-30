@@ -443,6 +443,10 @@ function App() {
             setPendingFile={setPendingFile}
             uploadCatalog={uploadCatalog}
             setUploadCatalog={setUploadCatalog}
+            uploadDriveFolderId={uploadDriveFolderId}
+            setUploadDriveFolderId={setUploadDriveFolderId}
+            uploadDriveFolderName={uploadDriveFolderName}
+            setUploadDriveFolderName={setUploadDriveFolderName}
             uploadError={uploadError}
             setUploadError={setUploadError}
             isUploading={isUploading}
@@ -479,6 +483,10 @@ function AppRoutes({
   setPendingFile,
   uploadCatalog,
   setUploadCatalog,
+  uploadDriveFolderId,
+  setUploadDriveFolderId,
+  uploadDriveFolderName,
+  setUploadDriveFolderName,
   uploadError,
   setUploadError,
   isUploading,
@@ -524,6 +532,10 @@ function AppRoutes({
           setPendingFile={setPendingFile}
           uploadCatalog={uploadCatalog}
           setUploadCatalog={setUploadCatalog}
+          uploadDriveFolderId={uploadDriveFolderId}
+          setUploadDriveFolderId={setUploadDriveFolderId}
+          uploadDriveFolderName={uploadDriveFolderName}
+          setUploadDriveFolderName={setUploadDriveFolderName}
           uploadError={uploadError}
           setUploadError={setUploadError}
           isUploading={isUploading}
@@ -549,6 +561,10 @@ function LanguageRoutes({
   setPendingFile,
   uploadCatalog,
   setUploadCatalog,
+  uploadDriveFolderId,
+  setUploadDriveFolderId,
+  uploadDriveFolderName,
+  setUploadDriveFolderName,
   uploadError,
   setUploadError,
   isUploading,
