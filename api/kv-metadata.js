@@ -648,6 +648,7 @@ export default async function handler(request) {
         
         // CÁCH 1: Thử dùng request.json() nếu có (Web Standard Request API)
         // QUAN TRỌNG: PHẢI check typeof === 'function' TRƯỚC KHI gọi
+        // LƯU Ý: Ở local test với MockRequest có json(), nhưng trên Vercel có thể khác
         const jsonMethod = request?.json;
         const isJsonFunction = typeof jsonMethod === 'function';
         
@@ -656,27 +657,37 @@ export default async function handler(request) {
           type: typeof jsonMethod,
           isFunction: isJsonFunction,
           value: jsonMethod,
+          isRequestInstance: request instanceof Request,
+          constructor: request?.constructor?.name,
         });
         
         if (isJsonFunction) {
           console.log('[KV Metadata] ✅ Using request.json() (Web Standard Request API)...');
+          const jsonStartTime = Date.now();
           try {
             // SAFE: Đã verify là function rồi mới gọi
+            // QUAN TRỌNG: Wrap trong timeout để tránh hang vô hạn
             const jsonPromise = jsonMethod.call(request);
             const timeoutPromise = new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
             );
             data = await Promise.race([jsonPromise, timeoutPromise]);
-            console.log('[KV Metadata] ✅ Request body parsed successfully via request.json()');
+            const jsonDuration = Date.now() - jsonStartTime;
+            console.log(`[KV Metadata] ✅ Request body parsed successfully via request.json() in ${jsonDuration}ms`);
             console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
           } catch (jsonError) {
-            console.error('[KV Metadata] ❌ request.json() failed:', {
+            const jsonDuration = Date.now() - jsonStartTime;
+            console.error(`[KV Metadata] ❌ request.json() failed after ${jsonDuration}ms:`, {
               error: jsonError.message,
               name: jsonError.name,
+              isTimeout: jsonError.message.includes('timeout'),
               stack: jsonError.stack?.split('\n').slice(0, 5).join('\n'),
             });
-            throw jsonError;
+            // KHÔNG throw ngay, sẽ thử fallback methods
+            console.log('[KV Metadata] ⚠️ Will try fallback methods...');
           }
+        } else {
+          console.log(`[KV Metadata] ⚠️ request.json is NOT a function (type: ${typeof jsonMethod}), will try fallback methods...`);
         }
         // CÁCH 2: Thử dùng request.body nếu là object (Vercel Node.js helper)
         if (!data && request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
