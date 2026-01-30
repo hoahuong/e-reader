@@ -22,12 +22,24 @@ export async function loadMetadataFromCloud() {
     const timeoutMs = 10000; // 10s timeout
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
+    // Log fetch options trước khi gửi GET request
+    const fetchOptions = {
+      method: 'GET',
+      signal: controller.signal,
+      cache: 'no-cache',
+    };
+    console.log('[Metadata Sync KV] 🔍 CLIENT DEBUG - GET Fetch options:', {
+      method: fetchOptions.method,
+      hasSignal: !!fetchOptions.signal,
+      cache: fetchOptions.cache,
+    });
+    
     try {
-      const response = await fetch('/api/kv-metadata', {
-        method: 'GET',
-        signal: controller.signal,
-        cache: 'no-cache',
-      });
+      console.log('[Metadata Sync KV] 🔍 CLIENT DEBUG - About to call fetch() for GET...');
+      const fetchStartTime = Date.now();
+      const response = await fetch('/api/kv-metadata', fetchOptions);
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`[Metadata Sync KV] 🔍 CLIENT DEBUG - GET Fetch completed in ${fetchDuration}ms, status: ${response.status}`);
       clearTimeout(timeoutId);
       
       if (!response.ok) {
@@ -111,19 +123,45 @@ export async function saveMetadataToCloud(catalogs, files) {
     
     console.log(`[Metadata Sync KV] Đang lưu metadata lên Vercel KV: ${payload.catalogs.length} catalogs, ${payload.files.length} files`);
     
+    // Log chi tiết payload trước khi gửi
+    const payloadString = JSON.stringify(payload);
+    console.log('[Metadata Sync KV] 🔍 CLIENT DEBUG - Payload details:', {
+      catalogsCount: payload.catalogs.length,
+      filesCount: payload.files.length,
+      payloadSize: payloadString.length,
+      payloadSizeKB: (payloadString.length / 1024).toFixed(2),
+      hasLastSync: !!payload.lastSync,
+      payloadPreview: payloadString.substring(0, 200),
+    });
+    
     const controller = new AbortController();
     const timeoutMs = 25000; // 25s timeout cho save operation (match với maxDuration của API)
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
+    // Log fetch options trước khi gửi
+    const fetchOptions = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: payloadString,
+      signal: controller.signal,
+    };
+    console.log('[Metadata Sync KV] 🔍 CLIENT DEBUG - Fetch options:', {
+      method: fetchOptions.method,
+      headers: fetchOptions.headers,
+      bodyType: typeof fetchOptions.body,
+      bodyLength: fetchOptions.body.length,
+      bodyPreview: fetchOptions.body.substring(0, 200),
+      hasSignal: !!fetchOptions.signal,
+    });
+    
     try {
-      const response = await fetch('/api/kv-metadata', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
+      console.log('[Metadata Sync KV] 🔍 CLIENT DEBUG - About to call fetch()...');
+      const fetchStartTime = Date.now();
+      const response = await fetch('/api/kv-metadata', fetchOptions);
+      const fetchDuration = Date.now() - fetchStartTime;
+      console.log(`[Metadata Sync KV] 🔍 CLIENT DEBUG - Fetch completed in ${fetchDuration}ms, status: ${response.status}`);
       clearTimeout(timeoutId);
 
       if (!response.ok) {

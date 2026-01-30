@@ -401,24 +401,76 @@ export default async function handler(request) {
       timestamp: handlerEntryTime,
     });
     
-    // Debug request object properties - QUAN TRỌNG: kiểm tra bodyUsed
-    console.log('[KV Metadata] Request object debug:', {
+    // Debug request object properties - QUAN TRỌNG: kiểm tra chi tiết request object
+    const requestDebug = {
       type: typeof request,
+      isNull: request === null,
+      isUndefined: request === undefined,
       constructor: request?.constructor?.name,
+      prototype: Object.getPrototypeOf(request || {})?.constructor?.name,
       isRequest: request instanceof Request,
       hasJson: typeof request?.json === 'function',
+      jsonType: typeof request?.json,
+      jsonValue: request?.json,
       hasText: typeof request?.text === 'function',
+      textType: typeof request?.text,
       hasBody: !!request?.body,
-      bodyUsed: request?.bodyUsed, // QUAN TRỌNG: nếu true thì body đã bị consumed
+      bodyUsed: request?.bodyUsed,
       bodyType: typeof request?.body,
+      bodyIsStream: request?.body instanceof ReadableStream,
       method: request?.method,
       url: request?.url,
       headers: request?.headers ? Object.fromEntries(request.headers.entries()) : 'no headers',
-    });
+      // Log tất cả keys của request object
+      keys: Object.keys(request || {}).slice(0, 30),
+      // Log tất cả properties
+      ownProperties: Object.getOwnPropertyNames(request || {}).slice(0, 30),
+      // Log prototype chain
+      prototypeChain: [],
+    };
+    
+    // Build prototype chain
+    let proto = Object.getPrototypeOf(request);
+    let depth = 0;
+    while (proto && depth < 5) {
+      requestDebug.prototypeChain.push({
+        name: proto.constructor?.name || 'Unknown',
+        hasJson: typeof proto.json === 'function',
+        keys: Object.keys(proto).slice(0, 10),
+      });
+      proto = Object.getPrototypeOf(proto);
+      depth++;
+    }
+    
+    console.log('[KV Metadata] 🔍 DETAILED Request object debug:', JSON.stringify(requestDebug, null, 2));
     
     // CẢNH BÁO nếu body đã bị consumed
     if (request?.bodyUsed === true) {
       console.error('[KV Metadata] ⚠️ WARNING: Request body đã bị consumed! Không thể gọi request.json() lần nữa.');
+    }
+    
+    // CẢNH BÁO nếu request.json không phải function - LOG CHI TIẾT
+    if (request && 'json' in request) {
+      const jsonType = typeof request.json;
+      if (jsonType !== 'function') {
+        console.error('[KV Metadata] ⚠️⚠️⚠️ CRITICAL: request.json tồn tại nhưng KHÔNG phải function!', {
+          jsonType: jsonType,
+          jsonValue: request.json,
+          jsonValueString: String(request.json),
+          jsonValueJSON: JSON.stringify(request.json),
+          jsonConstructor: request.json?.constructor?.name,
+          jsonPrototype: Object.getPrototypeOf(request.json)?.constructor?.name,
+          jsonIsNull: request.json === null,
+          jsonIsUndefined: request.json === undefined,
+          jsonIsObject: typeof request.json === 'object',
+          jsonIsString: typeof request.json === 'string',
+          jsonIsNumber: typeof request.json === 'number',
+          jsonIsBoolean: typeof request.json === 'boolean',
+          jsonKeys: typeof request.json === 'object' && request.json !== null ? Object.keys(request.json) : 'N/A',
+        });
+      }
+    } else if (request && typeof request.json === 'undefined') {
+      console.log('[KV Metadata] ℹ️ request.json không tồn tại (undefined) - sẽ dùng fallback');
     }
   
   // Kiểm tra format của KV_REST_API_URL
@@ -542,16 +594,38 @@ export default async function handler(request) {
       console.log('[KV Metadata] POST request - Bắt đầu xử lý...');
       
       // Đọc body từ request - QUAN TRỌNG: Xử lý cả Web Standard Request và Node.js req object
-      console.log('[KV Metadata] Reading request body...');
+      console.log('[KV Metadata] 🔍 Reading request body...');
       console.log('[KV Metadata] Body used before parsing:', request?.bodyUsed);
-      console.log('[KV Metadata] Request type check:', {
+      
+      // Log chi tiết request object TRƯỚC KHI parse
+      const preParseCheck = {
         hasJson: typeof request?.json === 'function',
+        jsonType: typeof request?.json,
+        jsonValue: request?.json,
+        jsonIsFunction: typeof request?.json === 'function',
+        jsonIsUndefined: typeof request?.json === 'undefined',
+        jsonIsNull: request?.json === null,
         hasBody: !!request?.body,
         bodyType: typeof request?.body,
+        bodyIsStream: request?.body instanceof ReadableStream,
+        bodyIsString: typeof request?.body === 'string',
+        bodyIsObject: typeof request?.body === 'object' && request?.body !== null,
         isRequest: request instanceof Request,
         constructor: request?.constructor?.name,
-        keys: Object.keys(request || {}).slice(0, 10),
-      });
+        keys: Object.keys(request || {}).slice(0, 20),
+      };
+      console.log('[KV Metadata] 🔍 Pre-parse check:', JSON.stringify(preParseCheck, null, 2));
+      
+      // QUAN TRỌNG: Nếu request.json tồn tại nhưng KHÔNG phải function, log chi tiết
+      if (request && 'json' in request && typeof request.json !== 'function') {
+        console.error('[KV Metadata] ❌ CRITICAL: request.json tồn tại nhưng KHÔNG phải function!', {
+          jsonType: typeof request.json,
+          jsonValue: request.json,
+          jsonConstructor: request.json?.constructor?.name,
+          jsonToString: String(request.json),
+          jsonStringified: JSON.stringify(request.json),
+        });
+      }
       
       let data;
       try {
@@ -563,29 +637,39 @@ export default async function handler(request) {
         
         // CÁCH 1: Thử dùng request.json() nếu có (Web Standard Request API)
         if (typeof request?.json === 'function') {
-          console.log('[KV Metadata] Using request.json() (Web Standard Request API)...');
-          const jsonPromise = request.json();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
-          );
-          data = await Promise.race([jsonPromise, timeoutPromise]);
-          console.log('[KV Metadata] Request body parsed successfully via request.json()');
-          console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
+          console.log('[KV Metadata] ✅ Using request.json() (Web Standard Request API)...');
+          try {
+            const jsonPromise = request.json();
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request body parsing timeout sau 3s')), 3000)
+            );
+            data = await Promise.race([jsonPromise, timeoutPromise]);
+            console.log('[KV Metadata] ✅ Request body parsed successfully via request.json()');
+            console.log('[KV Metadata] Body used after parsing:', request?.bodyUsed);
+          } catch (jsonError) {
+            console.error('[KV Metadata] ❌ request.json() failed:', {
+              error: jsonError.message,
+              name: jsonError.name,
+              stack: jsonError.stack?.split('\n').slice(0, 5).join('\n'),
+            });
+            throw jsonError;
+          }
         }
         // CÁCH 2: Thử dùng request.body nếu là object (Vercel Node.js helper)
         else if (request?.body && typeof request.body === 'object' && !(request.body instanceof ReadableStream)) {
-          console.log('[KV Metadata] Using request.body (Vercel Node.js helper)...');
+          console.log('[KV Metadata] ✅ Using request.body (Vercel Node.js helper)...');
           data = request.body;
-          console.log('[KV Metadata] Request body parsed successfully via request.body');
+          console.log('[KV Metadata] ✅ Request body parsed successfully via request.body');
         }
-        // CÁCH 3: Thử đọc từ body stream
+        // CÁCH 3: Thử đọc từ body stream hoặc string
         else if (request?.body) {
-          console.log('[KV Metadata] Reading from request.body stream...');
+          console.log('[KV Metadata] ✅ Reading from request.body...');
           if (typeof request.body === 'string') {
+            console.log('[KV Metadata] Body is string, parsing JSON...');
             data = JSON.parse(request.body);
-            console.log('[KV Metadata] Request body parsed successfully from string');
+            console.log('[KV Metadata] ✅ Request body parsed successfully from string');
           } else if (request.body instanceof ReadableStream) {
-            console.log('[KV Metadata] Reading from ReadableStream...');
+            console.log('[KV Metadata] Body is ReadableStream, reading chunks...');
             const reader = request.body.getReader();
             const chunks = [];
             while (true) {
@@ -595,14 +679,19 @@ export default async function handler(request) {
             }
             const bodyText = new TextDecoder().decode(new Uint8Array(chunks.flat()));
             data = JSON.parse(bodyText);
-            console.log('[KV Metadata] Request body parsed successfully from ReadableStream');
+            console.log('[KV Metadata] ✅ Request body parsed successfully from ReadableStream');
           } else {
-            throw new Error(`Không thể đọc request body: body type không được hỗ trợ (${typeof request.body})`);
+            console.error('[KV Metadata] ❌ Body type không được hỗ trợ:', {
+              bodyType: typeof request.body,
+              bodyConstructor: request.body?.constructor?.name,
+              bodyKeys: Object.keys(request.body || {}).slice(0, 10),
+            });
+            throw new Error(`Không thể đọc request body: body type không được hỗ trợ (${typeof request.body}, constructor: ${request.body?.constructor?.name})`);
           }
         }
         // CÁCH 4: Thử wrap trong Request object mới
         else {
-          console.log('[KV Metadata] Trying to create new Request object...');
+          console.log('[KV Metadata] ✅ Trying to create new Request object...');
           try {
             const newRequest = new Request(request.url || 'http://localhost', {
               method: 'POST',
@@ -610,10 +699,14 @@ export default async function handler(request) {
               headers: request.headers,
             });
             data = await newRequest.json();
-            console.log('[KV Metadata] Request body parsed successfully via new Request object');
+            console.log('[KV Metadata] ✅ Request body parsed successfully via new Request object');
           } catch (wrapError) {
-            console.error('[KV Metadata] Failed to wrap request:', wrapError.message);
-            throw new Error(`Không thể đọc request body: không có cách nào để parse (json: ${typeof request?.json}, body: ${typeof request?.body})`);
+            console.error('[KV Metadata] ❌ Failed to wrap request:', {
+              error: wrapError.message,
+              name: wrapError.name,
+              stack: wrapError.stack?.split('\n').slice(0, 5).join('\n'),
+            });
+            throw new Error(`Không thể đọc request body: không có cách nào để parse (json: ${typeof request?.json}, body: ${typeof request?.body}, bodyConstructor: ${request?.body?.constructor?.name})`);
           }
         }
       } catch (parseError) {
