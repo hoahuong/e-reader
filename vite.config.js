@@ -13,5 +13,26 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+    // Proxy API routes đến Vercel dev server nếu đang chạy
+    // Hoặc sẽ fallback về mock/error nếu không có Vercel dev
+    proxy: {
+      '/api': {
+        target: process.env.VERCEL_DEV_URL || 'http://localhost:3000',
+        changeOrigin: true,
+        // Nếu Vercel dev không chạy, sẽ trả về 404
+        // Client code sẽ handle fallback về IndexedDB
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn('[Vite Proxy] API route không khả dụng, app sẽ fallback về IndexedDB');
+            // Không cần làm gì, client sẽ handle
+          });
+        },
+      },
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
   },
 })

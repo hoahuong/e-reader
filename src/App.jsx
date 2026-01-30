@@ -624,10 +624,10 @@ function LanguageRoutes({
                           }
                         }}
                       >
-                        <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
-                          <h3>📤 Upload PDF</h3>
+                        <div className="upload-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="upload-modal-title" aria-modal="true">
+                          <h3 id="upload-modal-title">📤 Upload PDF</h3>
                           <div className="upload-modal-content">
-                            <p><strong>File:</strong> {pendingFile.name}</p>
+                            <p><strong>📄 File:</strong> {pendingFile.name}</p>
                             <CatalogSelector
                               fileName={pendingFile.name}
                               selectedCatalog={uploadCatalog}
@@ -648,8 +648,8 @@ function LanguageRoutes({
                               }}
                             />
                             {uploadError && (
-                              <div className="upload-error-message">
-                                ⚠️ <strong>Lỗi:</strong> {uploadError}
+                              <div className="upload-error-message" role="alert">
+                                <strong>⚠️ Lỗi:</strong> {uploadError}
                                 <br />
                                 <small>Vui lòng thử lại hoặc kiểm tra kết nối mạng.</small>
                               </div>
@@ -660,6 +660,7 @@ function LanguageRoutes({
                               onClick={handleConfirmUpload} 
                               className="confirm-upload-btn"
                               disabled={isUploading}
+                              aria-label="Xác nhận upload PDF"
                             >
                               {isUploading ? '⏳ Đang upload...' : '✅ Upload'}
                             </button>
@@ -677,6 +678,7 @@ function LanguageRoutes({
                               }} 
                               className="cancel-upload-btn"
                               disabled={isUploading}
+                              aria-label="Hủy upload"
                             >
                               ❌ Hủy
                             </button>

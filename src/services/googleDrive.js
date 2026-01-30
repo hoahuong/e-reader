@@ -89,10 +89,17 @@ export async function initializeGoogleAPI() {
   return new Promise((resolve, reject) => {
     window.gapi.load('client', async () => {
       try {
-        await window.gapi.client.init({
-          apiKey: GOOGLE_API_KEY,
+        // Init config - API Key là optional nếu dùng OAuth token
+        const initConfig = {
           discoveryDocs: DISCOVERY_DOCS,
-        });
+        };
+        
+        // Chỉ thêm API Key nếu có
+        if (GOOGLE_API_KEY) {
+          initConfig.apiKey = GOOGLE_API_KEY;
+        }
+
+        await window.gapi.client.init(initConfig);
 
         // Initialize token client (callback sẽ được set trong loginGoogle)
         tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -103,6 +110,14 @@ export async function initializeGoogleAPI() {
             console.log('Token client initialized');
           },
         });
+
+        // Nếu đã có token trong localStorage, set vào gapi client
+        const savedToken = localStorage.getItem('google_access_token');
+        const expiry = localStorage.getItem('google_token_expiry');
+        if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+          console.log('[Google Drive] Restoring token from localStorage');
+          window.gapi.client.setToken({ access_token: savedToken });
+        }
 
         resolve();
       } catch (error) {
@@ -246,15 +261,88 @@ export async function listFolders(driveId = null) {
       params.corpora = 'drive';
     }
 
-    const response = await window.gapi.client.drive.files.list(params);
+    let response;
+    try {
+      response = await window.gapi.client.drive.files.list(params);
+    } catch (apiError) {
+      // Handle Google API errors
+      console.error('Google Drive API error:', apiError);
+      
+      let errorMessage = 'Lỗi Google Drive API';
+      if (apiError.result?.error) {
+        const error = apiError.result.error;
+        errorMessage = error.message || error.errors?.[0]?.message || error.error || JSON.stringify(error);
+      } else if (apiError.message) {
+        errorMessage = apiError.message;
+      } else if (typeof apiError === 'string') {
+        errorMessage = apiError;
+      }
+      
+      throw new Error(errorMessage);
+    }
 
-    const folders = response.result.files || [];
+    // Check for API errors in response
+    if (response.error) {
+      const error = response.error;
+      const errorMsg = error.message || error.errors?.[0]?.message || error.error || 'Lỗi Google Drive API';
+      throw new Error(errorMsg);
+    }
+
+    const folders = response?.result?.files || [];
+    
+    // Defensive check: đảm bảo folders là array
+    if (!Array.isArray(folders)) {
+      console.warn('Google Drive API returned invalid folders data:', folders);
+      return [];
+    }
     
     // Xây dựng tree structure
-    return buildFolderTree(folders);
+    const tree = buildFolderTree(folders);
+    
+    // Đảm bảo luôn trả về array
+    return Array.isArray(tree) ? tree : [];
   } catch (error) {
     console.error('Error listing folders:', error);
-    throw error;
+    
+    // Extract error message properly - handle all Google API error formats
+    let errorMessage = 'Lỗi không xác định khi tải folders';
+    
+    if (error instanceof Error) {
+      // Already an Error object with message
+      errorMessage = error.message;
+    } else if (error?.result?.error) {
+      // Google API error format: error.result.error
+      const apiError = error.result.error;
+      errorMessage = apiError.message || 
+                     apiError.errors?.[0]?.message || 
+                     apiError.error || 
+                     `Google Drive API Error: ${apiError.code || 'UNKNOWN'}`;
+    } else if (error?.error) {
+      // Google API error format: error.error
+      const apiError = error.error;
+      if (typeof apiError === 'string') {
+        errorMessage = apiError;
+      } else {
+        errorMessage = apiError.message || 
+                       apiError.errors?.[0]?.message || 
+                       apiError.error || 
+                       JSON.stringify(apiError);
+      }
+    } else if (error?.message) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else {
+      // Try to extract meaningful info
+      const status = error?.status || error?.statusCode;
+      if (status) {
+        errorMessage = `HTTP ${status}: ${error.statusText || 'Request failed'}`;
+      } else {
+        errorMessage = 'Lỗi không xác định khi tải folders từ Google Drive';
+      }
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 
@@ -363,13 +451,25 @@ export async function listFolderContents(folderId, driveId = null) {
  * Trả về tree structure (không flatten) để có thể expand/collapse
  */
 function buildFolderTree(folders) {
+  // Defensive check
+  if (!folders || !Array.isArray(folders)) {
+    console.warn('buildFolderTree: Invalid folders input', folders);
+    return [];
+  }
+
   // Tạo map để tìm children nhanh
   const folderMap = new Map();
   folders.forEach(f => {
+    // Defensive check cho mỗi folder
+    if (!f || !f.id || !f.name) {
+      console.warn('buildFolderTree: Invalid folder object', f);
+      return;
+    }
+    
     folderMap.set(f.id, { 
       id: f.id, 
       name: f.name, 
-      parents: f.parents || [],
+      parents: Array.isArray(f.parents) ? f.parents : [],
       children: [] 
     });
   });
@@ -377,13 +477,20 @@ function buildFolderTree(folders) {
   // Xây dựng tree
   const tree = [];
   folders.forEach(folder => {
+    if (!folder || !folder.id) return;
+    
     const folderData = folderMap.get(folder.id);
-    if (folder.parents && folder.parents.length > 0) {
+    if (!folderData) return;
+
+    if (folder.parents && Array.isArray(folder.parents) && folder.parents.length > 0) {
       const parentId = folder.parents[0];
-      if (parentId !== 'root' && folderMap.has(parentId)) {
-        folderMap.get(parentId).children.push(folderData);
+      if (parentId && parentId !== 'root' && folderMap.has(parentId)) {
+        const parent = folderMap.get(parentId);
+        if (parent && Array.isArray(parent.children)) {
+          parent.children.push(folderData);
+        }
       } else {
-        // Root folder
+        // Root folder hoặc parent không tồn tại
         tree.push(folderData);
       }
     } else {

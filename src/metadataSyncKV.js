@@ -34,12 +34,38 @@ export async function loadMetadataFromCloud() {
           console.log('[Metadata Sync KV] Không có metadata trên KV (chưa có data)');
           return null;
         }
+        
+        // 503 Service Unavailable = Redis chưa được setup
+        if (response.status === 503) {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn('[Metadata Sync KV] Upstash Redis chưa được setup:', errorData.details || errorData.error);
+          console.info('[Metadata Sync KV] Hướng dẫn setup:', errorData.instructions || 'Xem SETUP_GOOGLE_DRIVE_KV.md');
+          // Trả về null để app fallback về local storage
+          return null;
+        }
+        
         const errorText = await response.text();
         console.warn(`[Metadata Sync KV] API trả về lỗi ${response.status}:`, errorText);
         return null;
       }
       
-      const metadata = await response.json();
+      // Check content-type để đảm bảo là JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('[Metadata Sync KV] Response không phải JSON:', text.substring(0, 200));
+        return null;
+      }
+      
+      let metadata;
+      try {
+        metadata = await response.json();
+      } catch (jsonError) {
+        console.error('[Metadata Sync KV] Lỗi parse JSON:', jsonError);
+        const text = await response.text();
+        console.error('[Metadata Sync KV] Response text:', text.substring(0, 200));
+        return null;
+      }
       
       // Kiểm tra xem metadata có hợp lệ không
       if (metadata && (Array.isArray(metadata.catalogs) && Array.isArray(metadata.files))) {
@@ -58,8 +84,15 @@ export async function loadMetadataFromCloud() {
       throw fetchError;
     }
   } catch (error) {
-    console.error('[Metadata Sync KV] Lỗi khi load metadata:', error);
-    return null;
+    // Handle network errors, CORS errors, etc.
+    if (error.name === 'AbortError') {
+      console.warn('[Metadata Sync KV] Request timeout sau 10s, fallback về IndexedDB');
+    } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+      console.warn('[Metadata Sync KV] Network error, fallback về IndexedDB:', error.message);
+    } else {
+      console.error('[Metadata Sync KV] Lỗi khi load metadata:', error);
+    }
+    return null; // Fallback về IndexedDB
   }
 }
 
@@ -92,13 +125,25 @@ export async function saveMetadataToCloud(catalogs, files) {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorText = await response.text();
+        const errorText = await response.text().catch(() => 'Unknown error');
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { error: errorText || `HTTP ${response.status}` };
         }
+        
+        // Handle 500 errors (thường do thiếu env vars)
+        if (response.status === 500) {
+          if (errorData.error?.includes('Upstash Redis chưa được setup') || 
+              errorData.error?.includes('KV_REST_API_URL') ||
+              errorData.error?.includes('KV_REST_API_TOKEN')) {
+            console.warn('[Metadata Sync KV] Redis chưa được setup, không thể lưu metadata lên cloud');
+            console.warn('[Metadata Sync KV] Metadata sẽ chỉ lưu local (IndexedDB)');
+            throw new Error('Redis chưa được setup - chỉ lưu local');
+          }
+        }
+        
         console.error(`[Metadata Sync KV] API trả về lỗi ${response.status}:`, errorData);
         throw new Error(errorData.error || errorData.details || 'Không thể lưu metadata');
       }

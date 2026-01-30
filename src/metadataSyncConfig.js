@@ -14,6 +14,8 @@
 // 'vercel-blob': Vercel Blob Storage (cần BLOB_READ_WRITE_TOKEN)
 // 'github': GitHub API Storage (cần GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO)
 // 'local': Local Storage only - IndexedDB + localStorage backup (không cần config)
+// 
+// Lưu ý: Nếu chọn 'vercel-kv' nhưng chưa setup Redis, app sẽ tự động fallback về 'local'
 const STORAGE_TYPE = 'vercel-kv'; // 'vercel-kv' | 'vercel-blob' | 'github' | 'local'
 
 let metadataSyncModule = null;

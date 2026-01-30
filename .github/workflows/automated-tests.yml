@@ -1,0 +1,68 @@
+name: Automated Tests & Bug Detection
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  test-and-detect:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm run test:run
+    
+    - name: Run bug detection
+      run: node scripts/run-automated-tests.js
+    
+    - name: Upload bug report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: bug-report
+        path: |
+          bug-report.json
+          BUG_REPORT.md
+    
+    - name: Create issue for high priority bugs
+      if: contains(github.event.head_commit.message, 'bug') || contains(github.event.head_commit.message, 'fix')
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('bug-report.json', 'utf8'));
+          
+          const highPriorityBugs = report.bugs.filter(b => b.severity === 'high');
+          
+          if (highPriorityBugs.length > 0) {
+            const title = `🐛 High Priority Bugs Detected: ${highPriorityBugs.length}`;
+            const body = `## Bugs Detected\n\n` +
+              highPriorityBugs.map(bug => 
+                `- **${bug.id}**: ${bug.message}\n  - Component: ${bug.component || 'N/A'}\n  - Fix: ${bug.fix || 'N/A'}`
+              ).join('\n\n') +
+              `\n\nSee full report in artifacts.`;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'high-priority', 'automated']
+            });
+          }
